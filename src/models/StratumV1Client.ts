@@ -53,7 +53,7 @@ export class StratumV1Client {
     public hashRate: number = 0;
 
     private buffer: string = '';
-    
+
     constructor(
         public readonly socket: Socket,
         private readonly stratumV1JobsService: StratumV1JobsService,
@@ -65,7 +65,7 @@ export class StratumV1Client {
         private readonly configService: ConfigService,
         private readonly addressSettingsService: AddressSettingsService
     ) {
-
+        console.log('StratumV1Client created');
         this.socket.on('data', (data: Buffer) => {
             this.buffer += data.toString();
             let lines = this.buffer.split('\n');
@@ -110,6 +110,8 @@ export class StratumV1Client {
 
 
     private async handleMessage(message: string) {
+        console.log('Received messageeeeeeeeeeeeeeeeee: ', message);
+        console.log('-----.------------------------------>');
         //console.log(`Received from ${this.extraNonceAndSessionId}`, message);
 
         // Parse the message and check if it's the initial subscription message
@@ -217,7 +219,9 @@ export class StratumV1Client {
                     whitelist: true,
                     forbidNonWhitelisted: true,
                 };
-
+                console.log(authorizationMessage);
+                console.log("----------------------------->")
+                console.log(validatorOptions);
                 const errors = await validate(authorizationMessage, validatorOptions);
 
                 if (errors.length === 0) {
