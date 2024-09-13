@@ -10,7 +10,7 @@ command1_process = None
 
 docker_up = "docker compose -f full-setup/docker-compose-mainnet.yml up -d"
 docker_down = "docker compose -f full-setup/docker-compose-mainnet.yml down"
-cpuminer = "unbuffer /home/david/repos/cpuminer-multi/cpuminer -O 1FhDPLPpw18X4srecguG3MxJYe4a1JsZnd:bitcoin -a sha256d -o stratum+tcp://127.0.0.1:3333 -t 2"
+cpuminer = "unbuffer cpuminer-multi/cpuminer -O 1FhDPLPpw18X4srecguG3MxJYe4a1JsZnd:bitcoin -a sha256d -o stratum+tcp://127.0.0.1:3333 -t 2"
 pool = "npm run start:dev"
 
 # Function to run a command and forward stdout and stderr to terminal
@@ -50,6 +50,7 @@ print("Docker setup complete. Running additional commands...")
 pool_thread = threading.Thread(target=run_command, args=(pool, ))
 cpuminer_thread = threading.Thread(target=run_command, args=(cpuminer, ))
 pool_thread.start()
+time.sleep(5)
 cpuminer_thread.start()
 pool_thread.join()
 cpuminer_thread.join()
