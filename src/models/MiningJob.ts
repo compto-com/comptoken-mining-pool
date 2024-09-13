@@ -188,9 +188,8 @@ export class MiningJob {
                 jobTemplate.blockData.clearJobs
             ]
         };
-        console.log('\n\n\nMining Notify!!!!!!!!!!!!!!!! --------------->>')
+        console.log('Mining Notify ----------->>')
         console.log(JSON.stringify(job) + '\n');
-        console.log('\n\n\n END Mining Notify!!!!!!!!!!!!!!!! ---------------<<')
         return JSON.stringify(job) + '\n';
     }
 

@@ -110,8 +110,8 @@ export class StratumV1Client {
 
 
     private async handleMessage(message: string) {
-        console.log('Received messageeeeeeeeeeeeeeeeee: ', message);
-        console.log('-----.------------------------------>');
+        console.log('Received message: ', message);
+        console.log('----->');
         //console.log(`Received from ${this.extraNonceAndSessionId}`, message);
 
         // Parse the message and check if it's the initial subscription message
@@ -220,7 +220,7 @@ export class StratumV1Client {
                     forbidNonWhitelisted: true,
                 };
                 console.log(authorizationMessage);
-                console.log("----------------------------->")
+                console.log("------------==--------------->")
                 console.log(validatorOptions);
                 const errors = await validate(authorizationMessage, validatorOptions);
 

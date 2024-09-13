@@ -17,7 +17,7 @@ import { RpcBlocksModule } from './ORM/rpc-block/rpc-block.module';
 import { TelegramSubscriptionsModule } from './ORM/telegram-subscriptions/telegram-subscriptions.module';
 import { AppService } from './services/app.service';
 import { BitcoinRpcService } from './services/bitcoin-rpc.service';
-import { BraiinsService } from './services/braiins.service';
+// import { BraiinsService } from './services/braiins.service';
 import { BTCPayService } from './services/btc-pay.service';
 import { DiscordService } from './services/discord.service';
 import { NotificationService } from './services/notification.service';
@@ -68,7 +68,7 @@ const ORMModules = [
         BitcoinAddressValidator,
         StratumV1JobsService,
         BTCPayService,
-        BraiinsService
+        // BraiinsService
     ],
 })
 export class AppModule {
