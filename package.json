@@ -40,6 +40,7 @@
     "class-validator": "^0.14.0",
     "discord.js": "^14.11.0",
     "merkle-lib": "^2.0.10",
+    "nest": "^0.1.6",
     "node-telegram-bot-api": "^0.61.0",
     "reflect-metadata": "^0.1.13",
     "rpc-bitcoin": "^2.0.0",
