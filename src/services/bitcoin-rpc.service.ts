@@ -128,6 +128,7 @@ export class BitcoinRpcService implements OnModuleInit {
             }
         } catch (e) {
             console.error('Error getblocktemplate:', e.message);
+            console.error(e);
             throw new Error('Error getblocktemplate');
         }
         console.log(`getblocktemplate tx count: ${result.transactions.length}`);

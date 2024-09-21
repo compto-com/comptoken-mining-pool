@@ -1690,6 +1690,8 @@ static bool stratum_notify(struct stratum_ctx *sctx, json_t *params)
 	bool has_claim, has_roots;
 	json_t *merkle_arr;
 	uchar **merkle;
+	printf("---------------------------\n");
+	printf("JSON Output: %s\n", json_dumps(params, 0));
 
 	get_currentalgo(algo, sizeof(algo));
 	has_claim = strcmp(algo, "lbry") == 0 && json_array_size(params) == 10;
