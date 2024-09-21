@@ -1,3 +1,4 @@
 npm
 automake
 libcurl4-openssl-dev
+zlib1g-dev
