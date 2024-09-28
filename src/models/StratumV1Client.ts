@@ -28,7 +28,15 @@ import { StratumErrorMessage } from './stratum-messages/StratumErrorMessage';
 import { SubscriptionMessage } from './stratum-messages/SubscriptionMessage';
 import { SuggestDifficulty } from './stratum-messages/SuggestDifficultyMessage';
 import { StratumV1ClientStatistics } from './StratumV1ClientStatistics';
+import { PublicKey, sendAndConfirmTransaction, Transaction, Connection, Keypair }  from "@solana/web3.js";
+// import { compto_program_id_pubkey } from 'comptoken-js-offchain-cjs';
+import * as compto from '@compto/comptoken-js-offchain';
+import * as fs from 'fs';
+import * as path from 'path';
 
+(async () => {
+  console.log(compto);
+})();
 
 export class StratumV1Client {
 
@@ -112,6 +120,8 @@ export class StratumV1Client {
     private async handleMessage(message: string) {
         console.log('Received message: ', message);
         console.log('----->');
+
+        // console.log(compto_program_id_pubkey);
         //console.log(`Received from ${this.extraNonceAndSessionId}`, message);
 
         // Parse the message and check if it's the initial subscription message
@@ -247,45 +257,48 @@ export class StratumV1Client {
                 break;
             }
             case eRequestMethod.SUGGEST_DIFFICULTY: {
-                if (this.usedSuggestedDifficulty == true) {
-                    return;
-                }
+                return;
+                // No suggested difficulty for comptoken mining
 
-                const suggestDifficultyMessage = plainToInstance(
-                    SuggestDifficulty,
-                    parsedMessage
-                );
+                // if (this.usedSuggestedDifficulty == true) {
+                //     return;
+                // }
 
-                const validatorOptions: ValidatorOptions = {
-                    whitelist: true,
-                    forbidNonWhitelisted: true,
-                };
+                // const suggestDifficultyMessage = plainToInstance(
+                //     SuggestDifficulty,
+                //     parsedMessage
+                // );
 
-                const errors = await validate(suggestDifficultyMessage, validatorOptions);
+                // const validatorOptions: ValidatorOptions = {
+                //     whitelist: true,
+                //     forbidNonWhitelisted: true,
+                // };
 
-                if (errors.length === 0) {
+                // const errors = await validate(suggestDifficultyMessage, validatorOptions);
 
-                    this.clientSuggestedDifficulty = suggestDifficultyMessage;
-                    this.sessionDifficulty = suggestDifficultyMessage.suggestedDifficulty;
-                    const success = await this.write(JSON.stringify(this.clientSuggestedDifficulty.response(this.sessionDifficulty)) + '\n');
-                    if (!success) {
-                        return;
-                    }
-                    this.usedSuggestedDifficulty = true;
-                } else {
-                    console.error('Suggest difficulty validation error');
-                    const err = new StratumErrorMessage(
-                        suggestDifficultyMessage.id,
-                        eStratumErrorCode.OtherUnknown,
-                        'Suggest difficulty validation error',
-                        errors).response();
-                    console.error(err);
-                    const success = await this.write(err);
-                    if (!success) {
-                        return;
-                    }
-                }
-                break;
+                // if (errors.length === 0) {
+
+                //     this.clientSuggestedDifficulty = suggestDifficultyMessage;
+                //     this.sessionDifficulty = suggestDifficultyMessage.suggestedDifficulty;
+                //     const success = await this.write(JSON.stringify(this.clientSuggestedDifficulty.response(this.sessionDifficulty)) + '\n');
+                //     if (!success) {
+                //         return;
+                //     }
+                //     this.usedSuggestedDifficulty = true;
+                // } else {
+                //     console.error('Suggest difficulty validation error');
+                //     const err = new StratumErrorMessage(
+                //         suggestDifficultyMessage.id,
+                //         eStratumErrorCode.OtherUnknown,
+                //         'Suggest difficulty validation error',
+                //         errors).response();
+                //     console.error(err);
+                //     const success = await this.write(err);
+                //     if (!success) {
+                //         return;
+                //     }
+                // }
+                // break;
             }
             case eRequestMethod.SUBMIT: {
 
@@ -333,12 +346,12 @@ export class StratumV1Client {
                 }
                 break;
             }
-            // default: {
-            //     console.log("Invalid message");
-            //     console.log(parsedMessage);
-            //     await this.socket.end();
-            //     return;
-            // }
+            default: {
+                console.log("Invalid message");
+                console.log(parsedMessage);
+                await this.socket.end();
+                return;
+            }
         }
 
 
@@ -352,8 +365,12 @@ export class StratumV1Client {
     }
 
     private async initStratum() {
+        console.log('Initializing stratum');
+        console.log('oooooooooooooooooooooooooo')
+
         this.stratumInitialized = true;
 
+        console.log('user agent: ', this.clientSubscription.userAgent);
         switch (this.clientSubscription.userAgent) {
             case 'cpuminer': {
                 this.sessionDifficulty = 0.1;
@@ -363,6 +380,7 @@ export class StratumV1Client {
         if (this.clientSuggestedDifficulty == null) {
             //console.log(`Setting difficulty to ${this.sessionDifficulty}`)
             const setDifficulty = JSON.stringify(new SuggestDifficulty().response(this.sessionDifficulty));
+            console.log("Setting difficulty to: ", setDifficulty);
             const success = await this.write(setDifficulty + '\n');
             if (!success) {
                 return;
@@ -388,25 +406,25 @@ export class StratumV1Client {
 
     private async sendNewMiningJob(jobTemplate: IJobTemplate) {
 
-        let payoutInformation;
-        const devFeeAddress = this.configService.get('DEV_FEE_ADDRESS');
-        //50Th/s
-        this.noFee = false;
-        if (this.entity) {
-            this.hashRate = await this.clientStatisticsService.getHashRateForSession(this.clientAuthorization.address, this.clientAuthorization.worker, this.extraNonceAndSessionId);
-            this.noFee = this.hashRate != 0 && this.hashRate < 50000000000000;
-        }
-        if (this.noFee || devFeeAddress == null || devFeeAddress.length < 1) {
-            payoutInformation = [
-                { address: this.clientAuthorization.address, percent: 100 }
-            ];
+        // let payoutInformation;
+        // const devFeeAddress = this.configService.get('DEV_FEE_ADDRESS');
+        // //50Th/s
+        // this.noFee = false;
+        // if (this.entity) {
+        //     this.hashRate = await this.clientStatisticsService.getHashRateForSession(this.clientAuthorization.address, this.clientAuthorization.worker, this.extraNonceAndSessionId);
+        //     this.noFee = this.hashRate != 0 && this.hashRate < 50000000000000;
+        // }
+        // if (this.noFee || devFeeAddress == null || devFeeAddress.length < 1) {
+        //     payoutInformation = [
+        //         { address: this.clientAuthorization.address, percent: 100 }
+        //     ];
 
-        } else {
-            payoutInformation = [
-                { address: devFeeAddress, percent: 1.5 },
-                { address: this.clientAuthorization.address, percent: 98.5 }
-            ];
-        }
+        // } else {
+        //     payoutInformation = [
+        //         { address: devFeeAddress, percent: 1.5 },
+        //         { address: this.clientAuthorization.address, percent: 98.5 }
+        //     ];
+        // }
 
         const networkConfig = this.configService.get('NETWORK');
         let network;
@@ -424,7 +442,6 @@ export class StratumV1Client {
         const job = new MiningJob(
             network,
             this.stratumV1JobsService.getNextId(),
-            payoutInformation,
             jobTemplate
         );
 
@@ -486,117 +503,148 @@ export class StratumV1Client {
         }
         const jobTemplate = this.stratumV1JobsService.getJobTemplateById(job.jobTemplateId);
 
-        const updatedJobBlock = job.copyAndUpdateBlock(
-            jobTemplate,
-            parseInt(submission.versionMask, 16),
-            parseInt(submission.nonce, 16),
-            this.extraNonceAndSessionId,
-            submission.extraNonce2,
-            parseInt(submission.ntime, 16)
+        // const updatedJobBlock = job.copyAndUpdateBlock(
+        //     jobTemplate,
+        //     parseInt(submission.versionMask, 16),
+        //     parseInt(submission.nonce, 16),
+        //     this.extraNonceAndSessionId,
+        //     submission.extraNonce2,
+        //     parseInt(submission.ntime, 16)
+        // );
+        // const header = updatedJobBlock.toBuffer(true);
+        const versionMask = parseInt(submission.versionMask, 16);
+        let version = 2;
+        if (versionMask !== undefined && versionMask != 0) {
+            version = version ^ versionMask;
+        }
+
+        const comptokenProof = {
+            pubkey: jobTemplate.block.transactions,
+            recentBlockHash: this.hexStringToUint8Array(jobTemplate.block.currentblockhash),
+            data: this.extraNonceAndSessionId + submission.extraNonce2,
+            nonce: submission.nonce,
+            version: version,
+            timestamp: submission.ntime
+        } 
+        // const solPublicKey = new PublicKey("8BhexgFwZ2QcbG95GLGAincgEbSvRpwC7Q972giaVbSk");
+        const comptoPublicKey = new PublicKey("5N6p81LBD2qFoXPEskvtiPocAFagq1Ks36HFqiugEQVs");
+
+        const keypairPath = path.resolve(process.env.HOME || '', '.config', 'solana', 'id.json');
+        const keypair = this.loadKeypairFromFile(keypairPath);
+
+        let connection = new Connection("https://api.devnet.solana.com");
+        let mintComptokensTransaction = new Transaction();
+        mintComptokensTransaction.add(
+            await compto.createProofSubmissionInstruction(comptokenProof, comptoPublicKey, keypair.publicKey),
         );
-        const header = updatedJobBlock.toBuffer(true);
-        const { submissionDifficulty } = this.calculateDifficulty(header);
+
+
+        let mintComptokensResult = await sendAndConfirmTransaction(connection, mintComptokensTransaction, [keypair, keypair]);
+        console.log("mintComptokens transaction confirmed", mintComptokensResult);
+
+
+        // const { submissionDifficulty } = this.calculateDifficulty(header);
 
         //console.log(`DIFF: ${submissionDifficulty} of ${this.sessionDifficulty} from ${this.clientAuthorization.worker + '.' + this.extraNonceAndSessionId}`);
 
 
-        if (submissionDifficulty >= this.sessionDifficulty) {
+        // if (submissionDifficulty >= this.sessionDifficulty) {
 
-            if (submissionDifficulty >= jobTemplate.blockData.networkDifficulty) {
-                console.log('!!! BLOCK FOUND !!!');
-                const blockHex = updatedJobBlock.toHex(false);
-                const result = await this.bitcoinRpcService.SUBMIT_BLOCK(blockHex);
-                await this.blocksService.save({
-                    height: jobTemplate.blockData.height,
-                    minerAddress: this.clientAuthorization.address,
-                    worker: this.clientAuthorization.worker,
-                    sessionId: this.extraNonceAndSessionId,
-                    blockData: blockHex
-                });
+        //     if (submissionDifficulty >= jobTemplate.blockData.networkDifficulty) {
+        //         console.log('!!! BLOCK FOUND !!!');
+        //         const blockHex = updatedJobBlock.toHex(false);
+        //         const result = await this.bitcoinRpcService.SUBMIT_BLOCK(blockHex);
+        //         await this.blocksService.save({
+        //             height: jobTemplate.blockData.height,
+        //             minerAddress: this.clientAuthorization.address,
+        //             worker: this.clientAuthorization.worker,
+        //             sessionId: this.extraNonceAndSessionId,
+        //             blockData: blockHex
+        //         });
 
-                await this.notificationService.notifySubscribersBlockFound(this.clientAuthorization.address, jobTemplate.blockData.height, updatedJobBlock, result);
-                //success
-                if (result == null) {
-                    await this.addressSettingsService.resetBestDifficultyAndShares();
-                }
-            }
-            try {
-                await this.statistics.addShares(this.entity, this.sessionDifficulty);
-                const now = new Date();
-                // only update every minute
-                if (this.entity.updatedAt == null || now.getTime() - this.entity.updatedAt.getTime() > 1000 * 60) {
-                    await this.clientService.heartbeat(this.entity.address, this.entity.clientName, this.entity.sessionId, this.hashRate, now);
-                    this.entity.updatedAt = now;
-                }
+        //         await this.notificationService.notifySubscribersBlockFound(this.clientAuthorization.address, jobTemplate.blockData.height, updatedJobBlock, result);
+        //         //success
+        //         if (result == null) {
+        //             await this.addressSettingsService.resetBestDifficultyAndShares();
+        //         }
+        //     }
+        //     try {
+        //         await this.statistics.addShares(this.entity, this.sessionDifficulty);
+        //         const now = new Date();
+        //         // only update every minute
+        //         if (this.entity.updatedAt == null || now.getTime() - this.entity.updatedAt.getTime() > 1000 * 60) {
+        //             await this.clientService.heartbeat(this.entity.address, this.entity.clientName, this.entity.sessionId, this.hashRate, now);
+        //             this.entity.updatedAt = now;
+        //         }
 
-            } catch (e) {
-                console.log(e);
-                const err = new StratumErrorMessage(
-                    submission.id,
-                    eStratumErrorCode.DuplicateShare,
-                    'Duplicate share').response();
-                console.error(err);
-                const success = await this.write(err);
-                if (!success) {
-                    return false;
-                }
-                return false;
-            }
+        //     } catch (e) {
+        //         console.log(e);
+        //         const err = new StratumErrorMessage(
+        //             submission.id,
+        //             eStratumErrorCode.DuplicateShare,
+        //             'Duplicate share').response();
+        //         console.error(err);
+        //         const success = await this.write(err);
+        //         if (!success) {
+        //             return false;
+        //         }
+        //         return false;
+        //     }
 
-            if (submissionDifficulty > this.entity.bestDifficulty) {
-                await this.clientService.updateBestDifficulty(this.extraNonceAndSessionId, submissionDifficulty);
-                this.entity.bestDifficulty = submissionDifficulty;
-                if (submissionDifficulty > (await this.addressSettingsService.getSettings(this.clientAuthorization.address, true)).bestDifficulty) {
-                    await this.addressSettingsService.updateBestDifficulty(this.clientAuthorization.address, submissionDifficulty, this.entity.userAgent);
-                }
-            }
+        //     if (submissionDifficulty > this.entity.bestDifficulty) {
+        //         await this.clientService.updateBestDifficulty(this.extraNonceAndSessionId, submissionDifficulty);
+        //         this.entity.bestDifficulty = submissionDifficulty;
+        //         if (submissionDifficulty > (await this.addressSettingsService.getSettings(this.clientAuthorization.address, true)).bestDifficulty) {
+        //             await this.addressSettingsService.updateBestDifficulty(this.clientAuthorization.address, submissionDifficulty, this.entity.userAgent);
+        //         }
+        //     }
 
 
 
-        } else {
-            const err = new StratumErrorMessage(
-                submission.id,
-                eStratumErrorCode.LowDifficultyShare,
-                'Difficulty too low').response();
+        // } else {
+        //     const err = new StratumErrorMessage(
+        //         submission.id,
+        //         eStratumErrorCode.LowDifficultyShare,
+        //         'Difficulty too low').response();
 
-            const success = await this.write(err);
-            if (!success) {
-                return false;
-            }
+        //     const success = await this.write(err);
+        //     if (!success) {
+        //         return false;
+        //     }
 
-            return false;
-        }
+        //     return false;
+        // }
 
-        //await this.checkDifficulty();
-        return true;
+        // //await this.checkDifficulty();
+        // return true;
 
     }
 
     private async checkDifficulty() {
-        const targetDiff = this.statistics.getSuggestedDifficulty(this.sessionDifficulty);
-        if (targetDiff == null) {
-            return;
-        }
+        // const targetDiff = this.statistics.getSuggestedDifficulty(this.sessionDifficulty);
+        // if (targetDiff == null) {
+        //     return;
+        // }
 
-        if (targetDiff != this.sessionDifficulty) {
-            //console.log(`Adjusting ${this.extraNonceAndSessionId} difficulty from ${this.sessionDifficulty} to ${targetDiff}`);
-            this.sessionDifficulty = targetDiff;
+        // if (targetDiff != this.sessionDifficulty) {
+        //     //console.log(`Adjusting ${this.extraNonceAndSessionId} difficulty from ${this.sessionDifficulty} to ${targetDiff}`);
+        //     this.sessionDifficulty = targetDiff;
 
-            const data = JSON.stringify({
-                id: null,
-                method: eResponseMethod.SET_DIFFICULTY,
-                params: [targetDiff]
-            }) + '\n';
+        //     const data = JSON.stringify({
+        //         id: null,
+        //         method: eResponseMethod.SET_DIFFICULTY,
+        //         params: [targetDiff]
+        //     }) + '\n';
 
 
-            await this.socket.write(data);
+        //     await this.socket.write(data);
 
-            const jobTemplate = await firstValueFrom(this.stratumV1JobsService.newMiningJob$);
-            // we need to clear the jobs so that the difficulty set takes effect. Otherwise the different miner implementations can cause issues
-            jobTemplate.blockData.clearJobs = true;
-            await this.sendNewMiningJob(jobTemplate);
+        //     const jobTemplate = await firstValueFrom(this.stratumV1JobsService.newMiningJob$);
+        //     // we need to clear the jobs so that the difficulty set takes effect. Otherwise the different miner implementations can cause issues
+        //     jobTemplate.blockData.clearJobs = true;
+        //     await this.sendNewMiningJob(jobTemplate);
 
-        }
+        // }
     }
 
     private calculateDifficulty(header: Buffer): { submissionDifficulty: number, submissionHash: string } {
@@ -621,7 +669,38 @@ export class StratumV1Client {
         return number;
     }
 
+    private hexStringToUint8Array(hexString: string): Uint8Array {
+        // Remove any potential '0x' prefix from the hex string
+        if (hexString.startsWith('0x')) {
+          hexString = hexString.slice(2);
+        }
+      
+        // Ensure the hex string has an even length
+        if (hexString.length % 2 !== 0) {
+          throw new Error('Invalid hex string: length must be a multiple of 2');
+        }
+      
+        const byteArray = new Uint8Array(hexString.length / 2);
+      
+        for (let i = 0; i < hexString.length; i += 2) {
+          const byteHex = hexString.substr(i, 2);
+          const byteValue = parseInt(byteHex, 16);
+          if (isNaN(byteValue)) {
+            throw new Error(`Invalid hex string: contains non-hex characters at position ${i}`);
+          }
+          byteArray[i / 2] = byteValue;
+        }
+      
+        return byteArray;
+      }
+
+    private loadKeypairFromFile(keypairPath: string): Keypair {
+        const keypairData = JSON.parse(fs.readFileSync(keypairPath, 'utf-8'));
+        return Keypair.fromSecretKey(Uint8Array.from(keypairData));
+    }
+
     private async write(message: string): Promise<boolean> {
+        console.log('Writing message: ', message);
         try {
             if (!this.socket.destroyed && !this.socket.writableEnded) {
 

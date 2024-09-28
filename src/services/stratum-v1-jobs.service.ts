@@ -2,20 +2,22 @@ import { Injectable } from '@nestjs/common';
 import * as bitcoinjs from 'bitcoinjs-lib';
 import * as merkle from 'merkle-lib';
 import * as merkleProof from 'merkle-lib/proof';
-import { combineLatest, delay, filter, from, interval, map, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
+import { combineLatest, delay, filter, from, of, interval, map, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
 
 import { MiningJob } from '../models/MiningJob';
 import { BitcoinRpcService } from './bitcoin-rpc.service';
+import { IComptoBlockTemplate } from '../models/bitcoin-rpc/ComptoBlockTemplate';
+
+
 
 export interface IJobTemplate {
 
-    block: bitcoinjs.Block;
-    merkle_branch: string[];
+    block: IComptoBlockTemplate;
     blockData: {
         id: string,
-        coinbasevalue: number;
+        // coinbasevalue: number;
         networkDifficulty: number;
-        height: number;
+        // height: number;
         clearJobs: boolean;
     };
 }
@@ -43,7 +45,7 @@ export class StratumV1JobsService {
 
         this.newMiningJob$ = combineLatest([this.bitcoinRpcService.newBlock$, interval(60000).pipe(delay(this.delay), startWith(-1))]).pipe(
             switchMap(([miningInfo, interval]) => {
-                return from(this.bitcoinRpcService.getBlockTemplate(miningInfo.blocks)).pipe(map((blockTemplate) => {
+                return of(this.bitcoinRpcService.getBlockTemplate(miningInfo)).pipe(map((blockTemplate) => {
                     return {
                         blockTemplate,
                         interval
@@ -66,60 +68,78 @@ export class StratumV1JobsService {
 
                 this.lastIntervalCount = interval;
 
-                return {
-                    version: blockTemplate.version,
-                    bits: parseInt(blockTemplate.bits, 16),
-                    prevHash: this.convertToLittleEndian(blockTemplate.previousblockhash),
-                    transactions: blockTemplate.transactions.map(t => bitcoinjs.Transaction.fromHex(t.data)),
-                    coinbasevalue: blockTemplate.coinbasevalue,
-                    timestamp: Math.floor(new Date().getTime() / 1000),
-                    networkDifficulty: this.calculateNetworkDifficulty(parseInt(blockTemplate.bits, 16)),
-                    clearJobs,
-                    height: blockTemplate.height
-                };
-            }),
-            filter(next => next != null),
-            map(({ version, bits, prevHash, transactions, timestamp, coinbasevalue, networkDifficulty, clearJobs, height }) => {
-                const block = new bitcoinjs.Block();
-
-                //create an empty coinbase tx
-                const tempCoinbaseTx = new bitcoinjs.Transaction();
-                tempCoinbaseTx.version = 2;
-                tempCoinbaseTx.addInput(Buffer.alloc(32, 0), 0xffffffff, 0xffffffff);
-                tempCoinbaseTx.ins[0].witness = [Buffer.alloc(32, 0)];
-                transactions.unshift(tempCoinbaseTx);
-
-                const transactionBuffers = transactions.map(tx => tx.getHash(false));
-
-                const merkleTree = merkle(transactionBuffers, bitcoinjs.crypto.hash256);
-                const merkleBranches: Buffer[] = merkleProof(merkleTree, transactionBuffers[0]).filter(h => h != null);
-                block.merkleRoot = merkleBranches.pop();
-
-                // remove the first (coinbase) and last (root) element from the branch
-                const merkle_branch = merkleBranches.slice(1, merkleBranches.length).map(b => b.toString('hex'))
-
-                block.prevHash = prevHash;
-                block.version = version;
-                block.bits = bits;
-                block.timestamp = timestamp;
-
-                block.transactions = transactions;
-                block.witnessCommit = bitcoinjs.Block.calculateMerkleRoot(transactions, true);
-
                 const id = this.getNextTemplateId();
                 this.latestJobTemplateId++;
-                return {
-                    block,
-                    merkle_branch,
+
+
+                const comptoJob: IJobTemplate = {
+                    block: blockTemplate,
                     blockData: {
                         id,
-                        coinbasevalue,
-                        networkDifficulty,
-                        height,
-                        clearJobs
+                        networkDifficulty: this.calculateNetworkDifficulty(parseInt(blockTemplate.bits, 16)),
+                        clearJobs,
                     }
                 }
+                // return {
+                //     version: blockTemplate.version,
+                //     bits: parseInt(blockTemplate.bits, 16),
+                //     prevHash: this.convertToLittleEndian(blockTemplate.currentblockhash),
+                //     transactions: blockTemplate.transactions,
+                //     timestamp: ,
+                //     networkDifficulty: this.calculateNetworkDifficulty(parseInt(blockTemplate.bits, 16)),
+                //     clearJobs,
+                // };
+
+                // return {
+                //     block,
+                //     transactions,
+                //     blockData: {
+                //         id,
+                //         networkDifficulty,
+                //         clearJobs
+                //     }
+                // }
             }),
+            filter(next => next != null),
+            // map(({ version, bits, prevHash, transactions, timestamp, networkDifficulty, clearJobs }) => {
+            //     // const block = new bitcoinjs.Block();
+
+            //     //create an empty coinbase tx
+            //     // const tempCoinbaseTx = new bitcoinjs.Transaction();
+            //     // tempCoinbaseTx.version = 2;
+            //     // tempCoinbaseTx.addInput(Buffer.alloc(32, 0), 0xffffffff, 0xffffffff);
+            //     // tempCoinbaseTx.ins[0].witness = [Buffer.alloc(32, 0)];
+            //     // transactions.unshift(tempCoinbaseTx);
+
+            //     // const transactionBuffers = transactions.map(tx => tx.getHash(false));
+
+            //     // const merkleTree = merkle(transactionBuffers, bitcoinjs.crypto.hash256);
+            //     // const merkleBranches: Buffer[] = merkleProof(merkleTree, transactionBuffers[0]).filter(h => h != null);
+            //     // block.merkleRoot = merkleBranches.pop();
+
+            //     // remove the first (coinbase) and last (root) element from the branch
+            //     // const merkle_branch = merkleBranches.slice(1, merkleBranches.length).map(b => b.toString('hex'))
+
+            //     block.prevHash = prevHash;
+            //     block.version = version;
+            //     block.bits = bits;
+            //     block.timestamp = timestamp;
+
+            //     // block.transactions = transactions;
+            //     // block.witnessCommit = bitcoinjs.Block.calculateMerkleRoot(transactions, true);
+
+            //     // const id = this.getNextTemplateId();
+            //     // this.latestJobTemplateId++;
+            //     return {
+            //         block,
+            //         transactions,
+            //         blockData: {
+            //             id,
+            //             networkDifficulty,
+            //             clearJobs
+            //         }
+            //     }
+            // }),
             tap((data) => {
                 if (data.blockData.clearJobs) {
                     this.blocks = {};
@@ -139,6 +159,7 @@ export class StratumV1JobsService {
 
         const difficulty: number = (Math.pow(2, 208) * 65535) / target;    // Calculate the difficulty
 
+        console.log(`Network Difficulty: ${difficulty}`);
         return difficulty;
     }
 

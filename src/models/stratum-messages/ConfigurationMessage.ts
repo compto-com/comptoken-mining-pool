@@ -18,8 +18,8 @@ export class ConfigurationMessage extends StratumBaseMessage {
             id: this.id,
             error: null,
             result: {
-                'version-rolling': true,
-                'version-rolling.mask': '1fffe000'
+                // 'version-rolling': true,
+                // 'version-rolling.mask': '1fffe000'
             },
         };
     }
