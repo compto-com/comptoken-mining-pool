@@ -521,15 +521,9 @@ export class StratumV1Client {
         if (versionMask !== undefined && versionMask != 0) {
             version = version ^ versionMask;
         }
-        // version as hex
-        
+
         const xhashbuf = Buffer.from(this.extraNonceAndSessionId + submission.extraNonce2, 'hex');
-
-
         let extraDataHashed = this.doubleSHA256(xhashbuf);
-        let pubkeyBuffer = Buffer.from(jobTemplate.block.transactions[0], 'hex');
-        let merkleRoot = this.doubleSHA256(Buffer.concat([extraDataHashed, pubkeyBuffer]));
-        let merkleRootLE = this.hexStringToLittleEndianBuffer(merkleRoot.toString('hex'));
         const versionBuffer = Buffer.alloc(4);
         versionBuffer.writeUInt32LE(jobTemplate.block.version);
         const comptokenProof = new compto.ComptokenProof(
