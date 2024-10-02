@@ -571,6 +571,10 @@ static inline int scanhash_sha256d_8way(int thr_id, struct work *work,
 				pdata[19] = data[8 * 3 + i];
 				sha256d_80_swap(hash, pdata);
 				if (fulltest(hash, ptarget)) {
+					printf("fulltest\n");
+					printf("HASH FOUND >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>.\n");
+					printf("hash: %s\n", abin2hex(hash, 32));
+					printf("HASH FOUND >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>.\n");
 					work_set_target_ratio(work, hash);
 					*hashes_done = n - first_nonce + 1;
 					return 1;

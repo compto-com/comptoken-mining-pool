@@ -971,6 +971,7 @@ double target_to_diff(uint32_t* target)
 
 static bool send_line(curl_socket_t sock, char *s)
 {
+	printf("send_line: %s\n", s);
 	size_t sent = 0;
 	int len;
 
@@ -1104,6 +1105,7 @@ char *stratum_recv_line(struct stratum_ctx *sctx)
 out:
 	if (sret && opt_protocol)
 		applog(LOG_DEBUG, "< %s", sret);
+	printf("stratum_recv_line: %s\n", sret);
 	return sret;
 }
 
@@ -1427,8 +1429,10 @@ bool stratum_authorize(struct stratum_ctx *sctx, const char *user, const char *p
 			applog(LOG_DEBUG, "stratum extranonce subscribe timed out");
 		goto out;
 	}
-
+	printf("Going to receive extranonce --->\n");
 	sret = stratum_recv_line(sctx);
+
+	printf("Received extranonce ---> %s <--\n", sret);
 	if (sret) {
 		json_t *extra = JSON_LOADS(sret, &err);
 		if (!extra) {

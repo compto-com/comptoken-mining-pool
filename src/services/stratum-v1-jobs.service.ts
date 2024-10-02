@@ -80,6 +80,7 @@ export class StratumV1JobsService {
                         clearJobs,
                     }
                 }
+                return comptoJob;
                 // return {
                 //     version: blockTemplate.version,
                 //     bits: parseInt(blockTemplate.bits, 16),

@@ -11,6 +11,7 @@ import * as fs from 'node:fs';
 
 import * as compto from '@compto/comptoken-js-offchain';
 import { Connection, PublicKey } from "@solana/web3.js";
+import { getAssociatedTokenAddressSync, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 
 @Injectable()
 export class BitcoinRpcService implements OnModuleInit {
@@ -109,11 +110,22 @@ export class BitcoinRpcService implements OnModuleInit {
     }
 
     public getBlockTemplate(blockHash: Buffer): IComptoBlockTemplate {
+        console.log("getBlockTemplate");
+        
+        
+        
+        // let connection = new Connection("http://localhost:8899");
+        let testuser_pubkey = getAssociatedTokenAddressSync(compto.comptoken_mint_pubkey, compto.test_account.publicKey, false, TOKEN_2022_PROGRAM_ID);
+        const hexTestComptoAccount = Buffer.from(testuser_pubkey.toBytes()).toString('hex');
         const blockTemplate: IComptoBlockTemplate = {
-            version: 2,
+            version: 0x20000000,
             currentblockhash: blockHash.toString('hex'), // Example previous block hash
-            // token account public key: 5N6p81LBD2qFoXPEskvtiPocAFagq1Ks36HFqiugEQVs
-            transactions: ["40d6844ee09ff0aa305ad66e558a7957516b85a9b7d563211889fdeea87194fe"], // Array of strings as placeholders
+            // token account public key: 5N6p81LBD2qFoXPEskvtiPocAFagq1Ks36HFqiugEQVs devnet
+            // transactions: ["40d6844ee09ff0aa305ad66e558a7957516b85a9b7d563211889fdeea87194fe"],
+            // token account public key: 2L4Vw5ximfPFQud8CCfLivh6er7Hf1aXCYYGPNN9gvjF localhost
+            
+            transactions: [hexTestComptoAccount],
+            
             bits: "180eadd8", // Compressed target representation
             timestamp: Math.floor(new Date().getTime() / 1000), // Current timestamp in UNIX epoch time
         };
@@ -174,7 +186,7 @@ export class BitcoinRpcService implements OnModuleInit {
 
     public async getMiningInfo(): Promise<Buffer> {
         try {
-            let connection = new Connection("https://api.devnet.solana.com");
+            let connection = new Connection("http://localhost:8899");
             let getvalidblockhash: any = await compto.getValidBlockhashes(connection);
             console.log("getvalidblockhash", getvalidblockhash);
             console.log("getvalidblockhash", getvalidblockhash.validBlockhash);

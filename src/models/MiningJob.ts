@@ -171,18 +171,20 @@ export class MiningJob {
     // }
 
     public response(jobTemplate: IJobTemplate): string {
-
+        // const versionBuffer = Buffer.alloc(4);
+        // versionBuffer.writeUInt32LE();
+        let currentBlockhashNaturalOrder = this.swapEndianStrings(this.reverseHexString(jobTemplate.block.currentblockhash));
         const job: IMiningNotify = {
             id: null,
             method: eResponseMethod.MINING_NOTIFY,
             params: [
                 this.jobId,
-                this.swapEndianStrings(jobTemplate.block.currentblockhash),
+                currentBlockhashNaturalOrder,
                 "", // this.coinbasePart1,
                 "", // this.coinbasePart2,
                 jobTemplate.block.transactions,
                 jobTemplate.block.version.toString(16),
-                this.swapEndianStrings(jobTemplate.block.bits),
+                jobTemplate.block.bits,
                 jobTemplate.block.timestamp.toString(16),
                 jobTemplate.blockData.clearJobs
             ]
@@ -208,6 +210,20 @@ export class MiningJob {
         }
 
         return swappedBuffer;
+    }
+
+    private reverseHexString(hexString: string): string {
+        // Ensure the string length is even (each byte is 2 characters)
+        if (hexString.length % 2 !== 0) {
+            throw new Error("Invalid hex string length");
+        }
+        // Split the string into pairs of two characters (bytes)
+        const byteArray = hexString.match(/.{2}/g);
+        if (!byteArray) {
+            return ''; // Return an empty string if the hex string was empty
+        }
+        const reversedArray = byteArray.reverse();
+        return reversedArray.join('');
     }
 
 

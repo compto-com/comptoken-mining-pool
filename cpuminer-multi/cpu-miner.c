@@ -1853,7 +1853,6 @@ static void stratum_gen_work(struct stratum_ctx *sctx, struct work *work)
 					work->job_id, xnonce2str, swab32(work->data[17]));
 			free(xnonce2str);
 		}
-
 		switch (opt_algo) {
 			case ALGO_DROP:
 			case ALGO_JHA:

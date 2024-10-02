@@ -29,10 +29,12 @@ import { SubscriptionMessage } from './stratum-messages/SubscriptionMessage';
 import { SuggestDifficulty } from './stratum-messages/SuggestDifficultyMessage';
 import { StratumV1ClientStatistics } from './StratumV1ClientStatistics';
 import { PublicKey, sendAndConfirmTransaction, Transaction, Connection, Keypair }  from "@solana/web3.js";
+import { getAssociatedTokenAddressSync, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 // import { compto_program_id_pubkey } from 'comptoken-js-offchain-cjs';
 import * as compto from '@compto/comptoken-js-offchain';
 import * as fs from 'fs';
 import * as path from 'path';
+import e from 'express';
 
 (async () => {
   console.log(compto);
@@ -346,12 +348,12 @@ export class StratumV1Client {
                 }
                 break;
             }
-            default: {
-                console.log("Invalid message");
-                console.log(parsedMessage);
-                await this.socket.end();
-                return;
-            }
+            // default: {
+            //     console.log("Invalid message");
+            //     console.log(parsedMessage);
+            //     await this.socket.end();
+            //     return;
+            // }
         }
 
 
@@ -373,7 +375,7 @@ export class StratumV1Client {
         console.log('user agent: ', this.clientSubscription.userAgent);
         switch (this.clientSubscription.userAgent) {
             case 'cpuminer': {
-                this.sessionDifficulty = 0.1;
+                this.sessionDifficulty = 0.01;
             }
         }
 
@@ -405,6 +407,8 @@ export class StratumV1Client {
     }
 
     private async sendNewMiningJob(jobTemplate: IJobTemplate) {
+        console.log('Sending new job');
+        console.log(jobTemplate);
 
         // let payoutInformation;
         // const devFeeAddress = this.configService.get('DEV_FEE_ADDRESS');
@@ -513,35 +517,42 @@ export class StratumV1Client {
         // );
         // const header = updatedJobBlock.toBuffer(true);
         const versionMask = parseInt(submission.versionMask, 16);
-        let version = 2;
+        let version = 0x20000000;
         if (versionMask !== undefined && versionMask != 0) {
             version = version ^ versionMask;
         }
+        // version as hex
+        
+        const xhashbuf = Buffer.from(this.extraNonceAndSessionId + submission.extraNonce2, 'hex');
 
-        const comptokenProof = {
-            pubkey: jobTemplate.block.transactions,
-            recentBlockHash: this.hexStringToUint8Array(jobTemplate.block.currentblockhash),
-            data: this.extraNonceAndSessionId + submission.extraNonce2,
-            nonce: submission.nonce,
-            version: version,
-            timestamp: submission.ntime
-        } 
-        // const solPublicKey = new PublicKey("8BhexgFwZ2QcbG95GLGAincgEbSvRpwC7Q972giaVbSk");
-        const comptoPublicKey = new PublicKey("5N6p81LBD2qFoXPEskvtiPocAFagq1Ks36HFqiugEQVs");
 
-        const keypairPath = path.resolve(process.env.HOME || '', '.config', 'solana', 'id.json');
-        const keypair = this.loadKeypairFromFile(keypairPath);
+        let extraDataHashed = this.doubleSHA256(xhashbuf);
+        let pubkeyBuffer = Buffer.from(jobTemplate.block.transactions[0], 'hex');
+        let merkleRoot = this.doubleSHA256(Buffer.concat([extraDataHashed, pubkeyBuffer]));
+        let merkleRootLE = this.hexStringToLittleEndianBuffer(merkleRoot.toString('hex'));
+        const versionBuffer = Buffer.alloc(4);
+        versionBuffer.writeUInt32LE(jobTemplate.block.version);
+        const comptokenProof = new compto.ComptokenProof(
+            Buffer.from(jobTemplate.block.transactions[0], 'hex'),
+            this.hexStringToLittleEndianBuffer(jobTemplate.block.currentblockhash),
+            extraDataHashed,
+            this.hexStringToLittleEndianBuffer(submission.nonce),
+            versionBuffer,
+            this.hexStringToLittleEndianBuffer(submission.ntime),
+        ); 
 
-        let connection = new Connection("https://api.devnet.solana.com");
+        let connection = new Connection("http://localhost:8899");
+        let testuser_compto_pubkey = getAssociatedTokenAddressSync(compto.comptoken_mint_pubkey, compto.test_account.publicKey, false, TOKEN_2022_PROGRAM_ID);
         let mintComptokensTransaction = new Transaction();
         mintComptokensTransaction.add(
-            await compto.createProofSubmissionInstruction(comptokenProof, comptoPublicKey, keypair.publicKey),
+            await compto.createProofSubmissionInstruction(comptokenProof, compto.test_account.publicKey, testuser_compto_pubkey),
         );
 
 
-        let mintComptokensResult = await sendAndConfirmTransaction(connection, mintComptokensTransaction, [keypair, keypair]);
+        let mintComptokensResult = await sendAndConfirmTransaction(connection, mintComptokensTransaction, [compto.test_account, compto.test_account]);
+        console.log("==================================================================================");
         console.log("mintComptokens transaction confirmed", mintComptokensResult);
-
+        console.log("==================================================================================");
 
         // const { submissionDifficulty } = this.calculateDifficulty(header);
 
@@ -587,12 +598,7 @@ export class StratumV1Client {
         //         const success = await this.write(err);
         //         if (!success) {
         //             return false;
-        //         }
-        //         return false;
-        //     }
-
-        //     if (submissionDifficulty > this.entity.bestDifficulty) {
-        //         await this.clientService.updateBestDifficulty(this.extraNonceAndSessionId, submissionDifficulty);
+        //         }staticxtraNonceAndSessionId, submissionDifficulty);
         //         this.entity.bestDifficulty = submissionDifficulty;
         //         if (submissionDifficulty > (await this.addressSettingsService.getSettings(this.clientAuthorization.address, true)).bestDifficulty) {
         //             await this.addressSettingsService.updateBestDifficulty(this.clientAuthorization.address, submissionDifficulty, this.entity.userAgent);
@@ -615,36 +621,43 @@ export class StratumV1Client {
         //     return false;
         // }
 
-        // //await this.checkDifficulty();
-        // return true;
+        await this.checkDifficulty();
+        return true;
 
     }
 
+    private doubleSHA256(data: Buffer): Buffer {
+        const firstHash = crypto.createHash('sha256').update(data).digest();
+        const secondHash = crypto.createHash('sha256').update(firstHash).digest();
+        return secondHash;
+    }
+
     private async checkDifficulty() {
-        // const targetDiff = this.statistics.getSuggestedDifficulty(this.sessionDifficulty);
-        // if (targetDiff == null) {
-        //     return;
-        // }
+        const targetDiff = this.statistics.getSuggestedDifficulty(this.sessionDifficulty);
+        if (targetDiff == null) {
+            return;
+        }
 
-        // if (targetDiff != this.sessionDifficulty) {
-        //     //console.log(`Adjusting ${this.extraNonceAndSessionId} difficulty from ${this.sessionDifficulty} to ${targetDiff}`);
-        //     this.sessionDifficulty = targetDiff;
+        if (targetDiff != this.sessionDifficulty) {
+            //console.log(`Adjusting ${this.extraNonceAndSessionId} difficulty from ${this.sessionDifficulty} to ${targetDiff}`);
+            this.sessionDifficulty = targetDiff;
 
-        //     const data = JSON.stringify({
-        //         id: null,
-        //         method: eResponseMethod.SET_DIFFICULTY,
-        //         params: [targetDiff]
-        //     }) + '\n';
+            const data = JSON.stringify({
+                id: null,
+                method: eResponseMethod.SET_DIFFICULTY,
+                params: [targetDiff]
+            }) + '\n';
 
 
-        //     await this.socket.write(data);
+            await this.socket.write(data);
+            console.log('start to await newMiningJob$.');
+            const jobTemplate = await firstValueFrom(this.stratumV1JobsService.newMiningJob$);
+            console.log('finish await newMiningJob$');
+            // we need to clear the jobs so that the difficulty set takes effect. Otherwise the different miner implementations can cause issues
+            jobTemplate.blockData.clearJobs = true;
+            await this.sendNewMiningJob(jobTemplate);
 
-        //     const jobTemplate = await firstValueFrom(this.stratumV1JobsService.newMiningJob$);
-        //     // we need to clear the jobs so that the difficulty set takes effect. Otherwise the different miner implementations can cause issues
-        //     jobTemplate.blockData.clearJobs = true;
-        //     await this.sendNewMiningJob(jobTemplate);
-
-        // }
+        }
     }
 
     private calculateDifficulty(header: Buffer): { submissionDifficulty: number, submissionHash: string } {
@@ -698,6 +711,44 @@ export class StratumV1Client {
         const keypairData = JSON.parse(fs.readFileSync(keypairPath, 'utf-8'));
         return Keypair.fromSecretKey(Uint8Array.from(keypairData));
     }
+
+    private hexStringToLittleEndianBuffer(hexString: string): Buffer {
+        // Remove any leading "0x" if present
+        if (hexString.startsWith('0x') || hexString.startsWith('0X')) {
+            hexString = hexString.slice(2);
+        }
+    
+        // Ensure hex string length is even (full bytes)
+        if (hexString.length % 2 !== 0) {
+            hexString = '0' + hexString; // Pad with leading zero
+        }
+    
+        // Split hex string into an array of bytes (two hex characters each)
+        const bytes = hexString.match(/.{2}/g);
+        if (!bytes) {
+            return Buffer.alloc(0); // Return empty buffer if no bytes
+        }
+    
+        const wordSize = 4; // Word size in bytes (e.g., 4 bytes for 32-bit word)
+        const bufferArray: number[] = [];
+    
+        for (let i = 0; i < bytes.length; i += wordSize) {
+            // Get the next word's bytes
+            const wordBytes = bytes.slice(i, i + wordSize);
+    
+            // Reverse the bytes within the word for little-endian representation
+            const reversedWordBytes = wordBytes.reverse();
+    
+            // Convert the hex strings to numbers and add to buffer array
+            reversedWordBytes.forEach(byteStr => {
+                bufferArray.push(parseInt(byteStr, 16));
+            });
+        }
+    
+        // Create a Buffer from the array of bytes
+        return Buffer.from(bufferArray);
+    }
+
 
     private async write(message: string): Promise<boolean> {
         console.log('Writing message: ', message);

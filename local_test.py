@@ -12,7 +12,7 @@ script_dir = os.path.dirname(os.path.realpath(__file__))
 full_setup_dir = os.path.join(script_dir, "full-setup")
 docker_up = f"docker compose -f {full_setup_dir}/docker-compose-mainnet.yml up -d"
 docker_down = f"docker compose -f {full_setup_dir}/docker-compose-mainnet.yml down"
-cpuminer = "unbuffer cpuminer-multi/cpuminer -O 1FhDPLPpw18X4srecguG3MxJYe4a1JsZnd:bitcoin -a sha256d -o stratum+tcp://127.0.0.1:3333 -t 2"
+cpuminer = f"unbuffer {script_dir}/cpuminer-multi/cpuminer -O 1FhDPLPpw18X4srecguG3MxJYe4a1JsZnd:bitcoin -a sha256d -o stratum+tcp://127.0.0.1:3333 -t 2"
 # cpuminer = f"unbuffer {script_dir}/cpuminer-multi/cpuminer -O 1FhDPLPpw18X4srecguG3MxJYe4a1JsZnd:bitcoin -a sha256d -o stratum+tcp://public-pool.io:21496 -t 2"
 pool = "npm run start:dev"
 
