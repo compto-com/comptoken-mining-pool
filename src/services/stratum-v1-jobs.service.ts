@@ -21,9 +21,7 @@ export interface IJobTemplate {
     block: IComptoBlockTemplate;
     blockData: {
         id: string;
-        // coinbasevalue: number;
         networkDifficulty: number;
-        // height: number;
         clearJobs: boolean;
     };
 }

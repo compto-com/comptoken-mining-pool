@@ -1,13 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 
 import { BlocksEntity } from './blocks.entity';
 
 @Injectable()
 export class BlocksService {
     constructor(
-        private dataSource: DataSource,
         @InjectRepository(BlocksEntity)
         private blocksRepository: Repository<BlocksEntity>,
     ) {}

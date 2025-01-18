@@ -1,6 +1,5 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Block } from 'bitcoinjs-lib';
 import {
     Client,
     Collection,
@@ -171,11 +170,7 @@ export class DiscordService implements OnModuleInit {
         }
     }
 
-    public async notifySubscribersBlockFound(
-        height: number,
-        block: Block,
-        message: string,
-    ) {
+    public async notifySubscribersBlockFound(height: number, message: string) {
         if (
             process.env.NODE_APP_INSTANCE == null ||
             process.env.NODE_APP_INSTANCE == '0'

@@ -10,22 +10,25 @@ import { IComptoBlockTemplate } from '../models/bitcoin-rpc/ComptoBlockTemplate'
 import * as fs from 'node:fs';
 
 import * as compto from '@compto/comptoken-js-offchain';
-import { getAssociatedTokenAddressSync, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
-import { Connection } from "@solana/web3.js";
+import {
+    getAssociatedTokenAddressSync,
+    TOKEN_2022_PROGRAM_ID,
+} from '@solana/spl-token';
+import { Connection } from '@solana/web3.js';
 
 @Injectable()
 export class BitcoinRpcService implements OnModuleInit {
-
     private blockHash = null;
     private client: RPCClient;
-    private _newBlock$: BehaviorSubject<Buffer> = new BehaviorSubject(undefined);
-    public newBlock$ = this._newBlock$.pipe(filter(block => block != null), shareReplay({ refCount: true, bufferSize: 1 }));
+    private _newBlock$: BehaviorSubject<Buffer> = new BehaviorSubject(
+        undefined,
+    );
+    public newBlock$ = this._newBlock$.pipe(
+        filter((block) => block != null),
+        shareReplay({ refCount: true, bufferSize: 1 }),
+    );
 
-    constructor(
-        private readonly configService: ConfigService,
-        private rpcBlockService: RpcBlockService
-    ) {
-    }
+    constructor(private readonly configService: ConfigService) {}
 
     async onModuleInit() {
         const url = this.configService.get('BITCOIN_RPC_URL');
@@ -34,29 +37,29 @@ export class BitcoinRpcService implements OnModuleInit {
         const port = parseInt(this.configService.get('BITCOIN_RPC_PORT'));
         const timeout = parseInt(this.configService.get('BITCOIN_RPC_TIMEOUT'));
 
-        const cookiefile = this.configService.get('BITCOIN_RPC_COOKIEFILE')
+        const cookiefile = this.configService.get('BITCOIN_RPC_COOKIEFILE');
 
-        // const { compto_program_id_pubkey } = await import('@compto/comptoken-js-offchain');
-        // console.log(compto_program_id_pubkey);
         if (cookiefile != undefined && cookiefile != '') {
-            const cookie = fs.readFileSync(cookiefile).toString().split(':')
+            const cookie = fs.readFileSync(cookiefile).toString().split(':');
 
-            user = cookie[0]
-            pass = cookie[1]
+            user = cookie[0];
+            pass = cookie[1];
         }
 
         this.client = new RPCClient({ url, port, timeout, user, pass });
 
-        this.client.getrpcinfo().then((res) => {
-            console.log('Bitcoin RPC connected');
-        }, () => {
-            console.error('Could not reach RPC host');
-        });
+        this.client.getrpcinfo().then(
+            (res) => {
+                console.log('Bitcoin RPC connected');
+            },
+            () => {
+                console.error('Could not reach RPC host');
+            },
+        );
 
         if (this.configService.get('BITCOIN_ZMQ_HOST')) {
             console.log('Using ZMQ');
-            const sock = new zmq.Subscriber;
-
+            const sock = new zmq.Subscriber();
 
             sock.connectTimeout = 1000;
             sock.events.on('connect', () => {
@@ -71,9 +74,6 @@ export class BitcoinRpcService implements OnModuleInit {
             // Don't await this, otherwise it will block the rest of the program
             this.listenForNewBlocks(sock);
             await this.pollMiningInfo();
-
-            
-
         } else {
             setInterval(this.pollMiningInfo.bind(this), 10_000);
         }
@@ -81,50 +81,57 @@ export class BitcoinRpcService implements OnModuleInit {
 
     private async listenForNewBlocks(sock: zmq.Subscriber) {
         for await (const [topic, msg] of sock) {
-            console.log("New Block");
+            console.log('New Block');
             await this.pollMiningInfo();
         }
     }
 
     public async pollMiningInfo() {
-        
         const miningInfo = await this.getMiningInfo();
-        if (this.blockHash == null || (miningInfo != null && !miningInfo.equals(this.blockHash))) {
-            console.log("blockhash change!!!");
+        if (
+            this.blockHash == null ||
+            (miningInfo != null && !miningInfo.equals(this.blockHash))
+        ) {
+            console.log('blockhash change!!!');
             this._newBlock$.next(miningInfo);
             this.blockHash = miningInfo;
         }
     }
 
     public getBlockTemplate(blockHash: Buffer): IComptoBlockTemplate {
-        console.log("getBlockTemplate");
-        
-        
-        
-        // let connection = new Connection("http://localhost:8899");
-        let testuser_pubkey = getAssociatedTokenAddressSync(compto.comptoken_mint_pubkey, compto.test_account.publicKey, false, TOKEN_2022_PROGRAM_ID);
-        const hexTestComptoAccount = Buffer.from(testuser_pubkey.toBytes()).toString('hex');
+        console.log('getBlockTemplate');
+        let testuser_pubkey = getAssociatedTokenAddressSync(
+            compto.comptoken_mint_pubkey,
+            compto.test_account.publicKey,
+            false,
+            TOKEN_2022_PROGRAM_ID,
+        );
+        const hexTestComptoAccount = Buffer.from(
+            testuser_pubkey.toBytes(),
+        ).toString('hex');
         const blockTemplate: IComptoBlockTemplate = {
             version: 0x20000000,
             currentblockhash: blockHash.toString('hex'), // Example previous block hash
             // token account public key: 5N6p81LBD2qFoXPEskvtiPocAFagq1Ks36HFqiugEQVs devnet
             // transactions: ["40d6844ee09ff0aa305ad66e558a7957516b85a9b7d563211889fdeea87194fe"],
             // token account public key: 2L4Vw5ximfPFQud8CCfLivh6er7Hf1aXCYYGPNN9gvjF localhost
-            
+
             transactions: [hexTestComptoAccount],
-            
-            bits: "180eadd8", // Compressed target representation
+
+            bits: '180eadd8', // Compressed target representation
             timestamp: Math.floor(new Date().getTime() / 1000), // Current timestamp in UNIX epoch time
         };
-        return blockTemplate
+        return blockTemplate;
     }
 
     public async getMiningInfo(): Promise<Buffer> {
         try {
-            let connection = new Connection("http://localhost:8899");
-            let getvalidblockhash: any = await compto.getValidBlockhashes(connection);
-            console.log("getvalidblockhash", getvalidblockhash);
-            console.log("getvalidblockhash", getvalidblockhash.validBlockhash);
+            let connection = new Connection('http://localhost:8899');
+            let getvalidblockhash: any = await compto.getValidBlockhashes(
+                connection,
+            );
+            console.log('getvalidblockhash', getvalidblockhash);
+            console.log('getvalidblockhash', getvalidblockhash.validBlockhash);
             return getvalidblockhash.validBlockhash;
         } catch (e) {
             console.error('Error getmininginfo', e.message);
@@ -136,7 +143,7 @@ export class BitcoinRpcService implements OnModuleInit {
         let response: string = 'unknown';
         try {
             response = await this.client.submitblock({
-                hexdata
+                hexdata,
             });
             if (response == null) {
                 response = 'SUCCESS!';
@@ -149,7 +156,5 @@ export class BitcoinRpcService implements OnModuleInit {
             console.log(`BLOCK SUBMISSION RESPONSE ERROR: ${e}`);
         }
         return response;
-
     }
 }
-
