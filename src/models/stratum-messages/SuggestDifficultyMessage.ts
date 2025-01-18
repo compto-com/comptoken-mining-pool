@@ -12,8 +12,6 @@ export class SuggestDifficulty extends StratumBaseMessage {
     @IsNumber({}, { each: true })
     params: string | number[];
 
-
-
     @Expose()
     @IsNumber()
     @Transform(({ value, key, obj, type }) => {
@@ -24,17 +22,13 @@ export class SuggestDifficulty extends StratumBaseMessage {
     constructor() {
         super();
         this.method = eRequestMethod.SUGGEST_DIFFICULTY;
-
     }
-
-
 
     public response(difficulty: number) {
         return {
             id: null,
             method: eResponseMethod.SET_DIFFICULTY,
-            params: [difficulty]
-        }
+            params: [difficulty],
+        };
     }
 }
-

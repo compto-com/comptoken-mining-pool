@@ -35,5 +35,4 @@ export interface IBlockTemplate {
     height: number,                        // (numeric) The height of the next block
     default_witness_commitment: string     // (string, optional) a valid witness commitment for the unmodified block template
     capabilities: string[]
-
 }

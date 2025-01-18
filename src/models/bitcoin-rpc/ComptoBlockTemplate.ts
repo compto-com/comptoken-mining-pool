@@ -1,11 +1,10 @@
-
 export interface IComptoBlockTemplate {
     // (json object)
-    version: number;                       // (numeric) The preferred block version
-    currentblockhash: string,             // (string) The hash of current highest block
-    transactions: string[],                // (string) zero bitcoin compatibility placeholder
-    bits: string,                          // (string) compressed target of next block
-    timestamp: number,                     // (numeric) current timestamp in UNIX epoch time
+    version: number; // (numeric) The preferred block version
+    currentblockhash: string; // (string) The hash of current highest block
+    transactions: string[]; // (string) zero bitcoin compatibility placeholder
+    bits: string; // (string) compressed target of next block
+    timestamp: number; // (numeric) current timestamp in UNIX epoch time
 }
 
 // needed            version: blockTemplate.version,

@@ -5,12 +5,23 @@ import { Socket } from 'net';
 import { firstValueFrom, Subscription } from 'rxjs';
 import { clearInterval } from 'timers';
 
-import { getAssociatedTokenAddressSync, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
-import { Connection, sendAndConfirmTransaction, Transaction } from "@solana/web3.js";
+import * as compto from '@compto/comptoken-js-offchain';
+import {
+    getAssociatedTokenAddressSync,
+    TOKEN_2022_PROGRAM_ID,
+} from '@solana/spl-token';
+import {
+    Connection,
+    sendAndConfirmTransaction,
+    Transaction,
+} from '@solana/web3.js';
 import { ClientStatisticsService } from '../ORM/client-statistics/client-statistics.service';
 import { ClientEntity } from '../ORM/client/client.entity';
 import { ClientService } from '../ORM/client/client.service';
-import { IJobTemplate, StratumV1JobsService } from '../services/stratum-v1-jobs.service';
+import {
+    IJobTemplate,
+    StratumV1JobsService,
+} from '../services/stratum-v1-jobs.service';
 import { eRequestMethod } from './enums/eRequestMethod';
 import { eResponseMethod } from './enums/eResponseMethod';
 import { eStratumErrorCode } from './enums/eStratumErrorCode';
@@ -22,10 +33,8 @@ import { StratumErrorMessage } from './stratum-messages/StratumErrorMessage';
 import { SubscriptionMessage } from './stratum-messages/SubscriptionMessage';
 import { SuggestDifficulty } from './stratum-messages/SuggestDifficultyMessage';
 import { StratumV1ClientStatistics } from './StratumV1ClientStatistics';
-import * as compto from '@compto/comptoken-js-offchain';
 
 export class StratumV1Client {
-
     private clientSubscription: SubscriptionMessage;
     private clientConfiguration: ConfigurationMessage;
     private clientAuthorization: AuthorizationMessage;
@@ -60,7 +69,7 @@ export class StratumV1Client {
             this.buffer = lines.pop() || ''; // Save the last part of the data (incomplete line) to the buffer
 
             lines
-                .filter(m => m.length > 0)
+                .filter((m) => m.length > 0)
                 .forEach(async (m) => {
                     try {
                         await this.handleMessage(m);
@@ -70,12 +79,9 @@ export class StratumV1Client {
                     }
                 });
         });
-
-
     }
 
     public async destroy() {
-
         if (this.extraNonceAndSessionId) {
             await this.clientService.delete(this.extraNonceAndSessionId);
         }
@@ -84,7 +90,7 @@ export class StratumV1Client {
             this.stratumSubscription.unsubscribe();
         }
 
-        this.backgroundWork.forEach(work => {
+        this.backgroundWork.forEach((work) => {
             clearInterval(work);
         });
     }
@@ -95,7 +101,6 @@ export class StratumV1Client {
         const hexString = randomNumber.toString(16).padStart(8, '0'); // Convert to hex and pad with zeros
         return hexString;
     }
-
 
     private async handleMessage(message: string) {
         console.log('Received message: ', message);
@@ -110,8 +115,6 @@ export class StratumV1Client {
             return;
         }
 
-
-
         switch (parsedMessage.method) {
             case eRequestMethod.SUBSCRIBE: {
                 const subscriptionMessage = plainToInstance(
@@ -124,19 +127,31 @@ export class StratumV1Client {
                     forbidNonWhitelisted: true,
                 };
 
-                const errors = await validate(subscriptionMessage, validatorOptions);
+                const errors = await validate(
+                    subscriptionMessage,
+                    validatorOptions,
+                );
 
                 if (errors.length === 0) {
-
                     if (this.sessionStart == null) {
                         this.sessionStart = new Date();
-                        this.statistics = new StratumV1ClientStatistics(this.clientStatisticsService);
+                        this.statistics = new StratumV1ClientStatistics(
+                            this.clientStatisticsService,
+                        );
                         this.extraNonceAndSessionId = this.getRandomHexString();
-                        console.log(`New client ID: : ${this.extraNonceAndSessionId}, ${this.socket.remoteAddress}:${this.socket.remotePort}`);
+                        console.log(
+                            `New client ID: : ${this.extraNonceAndSessionId}, ${this.socket.remoteAddress}:${this.socket.remotePort}`,
+                        );
                     }
 
                     this.clientSubscription = subscriptionMessage;
-                    const success = await this.write(JSON.stringify(this.clientSubscription.response(this.extraNonceAndSessionId)) + '\n');
+                    const success = await this.write(
+                        JSON.stringify(
+                            this.clientSubscription.response(
+                                this.extraNonceAndSessionId,
+                            ),
+                        ) + '\n',
+                    );
                     if (!success) {
                         return;
                     }
@@ -146,7 +161,8 @@ export class StratumV1Client {
                         subscriptionMessage.id,
                         eStratumErrorCode.OtherUnknown,
                         'Subscription validation error',
-                        errors).response();
+                        errors,
+                    ).response();
                     console.error(err);
                     const success = await this.write(err);
                     if (!success) {
@@ -157,7 +173,6 @@ export class StratumV1Client {
                 break;
             }
             case eRequestMethod.CONFIGURE: {
-
                 const configurationMessage = plainToInstance(
                     ConfigurationMessage,
                     parsedMessage,
@@ -168,22 +183,28 @@ export class StratumV1Client {
                     forbidNonWhitelisted: true,
                 };
 
-                const errors = await validate(configurationMessage, validatorOptions);
+                const errors = await validate(
+                    configurationMessage,
+                    validatorOptions,
+                );
 
                 if (errors.length === 0) {
                     this.clientConfiguration = configurationMessage;
-                    const success = await this.write(JSON.stringify(this.clientConfiguration.response()) + '\n');
+                    const success = await this.write(
+                        JSON.stringify(this.clientConfiguration.response()) +
+                            '\n',
+                    );
                     if (!success) {
                         return;
                     }
-
                 } else {
                     console.error('Configuration validation error');
                     const err = new StratumErrorMessage(
                         configurationMessage.id,
                         eStratumErrorCode.OtherUnknown,
                         'Configuration validation error',
-                        errors).response();
+                        errors,
+                    ).response();
                     console.error(err);
                     const success = await this.write(err);
                     if (!success) {
@@ -194,7 +215,6 @@ export class StratumV1Client {
                 break;
             }
             case eRequestMethod.AUTHORIZE: {
-
                 const authorizationMessage = plainToInstance(
                     AuthorizationMessage,
                     parsedMessage,
@@ -205,13 +225,19 @@ export class StratumV1Client {
                     forbidNonWhitelisted: true,
                 };
                 console.log(authorizationMessage);
-                console.log("------------==--------------->")
+                console.log('------------==--------------->');
                 console.log(validatorOptions);
-                const errors = await validate(authorizationMessage, validatorOptions);
+                const errors = await validate(
+                    authorizationMessage,
+                    validatorOptions,
+                );
 
                 if (errors.length === 0) {
                     this.clientAuthorization = authorizationMessage;
-                    const success = await this.write(JSON.stringify(this.clientAuthorization.response()) + '\n');
+                    const success = await this.write(
+                        JSON.stringify(this.clientAuthorization.response()) +
+                            '\n',
+                    );
                     if (!success) {
                         return;
                     }
@@ -221,7 +247,8 @@ export class StratumV1Client {
                         authorizationMessage.id,
                         eStratumErrorCode.OtherUnknown,
                         'Authorization validation error',
-                        errors).response();
+                        errors,
+                    ).response();
                     console.error(err);
                     const success = await this.write(err);
                     if (!success) {
@@ -236,13 +263,11 @@ export class StratumV1Client {
                 // No suggested difficulty for comptoken mining
             }
             case eRequestMethod.SUBMIT: {
-
                 if (this.stratumInitialized == false) {
                     console.log('Submit before initalized');
                     await this.socket.end();
                     return;
                 }
-
 
                 const miningSubmitMessage = plainToInstance(
                     MiningSubmitMessage,
@@ -254,25 +279,32 @@ export class StratumV1Client {
                     forbidNonWhitelisted: true,
                 };
 
-                const errors = await validate(miningSubmitMessage, validatorOptions);
+                const errors = await validate(
+                    miningSubmitMessage,
+                    validatorOptions,
+                );
 
                 if (errors.length === 0 && this.stratumInitialized == true) {
-                    const result = await this.handleMiningSubmission(miningSubmitMessage);
+                    const result = await this.handleMiningSubmission(
+                        miningSubmitMessage,
+                    );
                     if (result == true) {
-                        const success = await this.write(JSON.stringify(miningSubmitMessage.response()) + '\n');
+                        const success = await this.write(
+                            JSON.stringify(miningSubmitMessage.response()) +
+                                '\n',
+                        );
                         if (!success) {
                             return;
                         }
                     }
-
-
                 } else {
                     console.log('Mining Submit validation error');
                     const err = new StratumErrorMessage(
                         miningSubmitMessage.id,
                         eStratumErrorCode.OtherUnknown,
                         'Mining Submit validation error',
-                        errors).response();
+                        errors,
+                    ).response();
                     console.error(err);
                     const success = await this.write(err);
                     if (!success) {
@@ -283,19 +315,18 @@ export class StratumV1Client {
             }
         }
 
-
-        if (this.clientSubscription != null
-            && this.clientAuthorization != null
-            && this.stratumInitialized == false) {
-
+        if (
+            this.clientSubscription != null &&
+            this.clientAuthorization != null &&
+            this.stratumInitialized == false
+        ) {
             await this.initStratum();
-
         }
     }
 
     private async initStratum() {
         console.log('Initializing stratum');
-        console.log('oooooooooooooooooooooooooo')
+        console.log('oooooooooooooooooooooooooo');
 
         this.stratumInitialized = true;
 
@@ -307,29 +338,33 @@ export class StratumV1Client {
         }
 
         if (this.clientSuggestedDifficulty == null) {
-            const setDifficulty = JSON.stringify(new SuggestDifficulty().response(this.sessionDifficulty));
-            console.log("Setting difficulty to: ", setDifficulty);
+            const setDifficulty = JSON.stringify(
+                new SuggestDifficulty().response(this.sessionDifficulty),
+            );
+            console.log('Setting difficulty to: ', setDifficulty);
             const success = await this.write(setDifficulty + '\n');
             if (!success) {
                 return;
             }
         }
 
-        this.stratumSubscription = this.stratumV1JobsService.newMiningJob$.subscribe(async (jobTemplate) => {
-            try {
-                await this.sendNewMiningJob(jobTemplate);
-            } catch (e) {
-                await this.socket.end();
-                console.error(e);
-            }
-        });
+        this.stratumSubscription =
+            this.stratumV1JobsService.newMiningJob$.subscribe(
+                async (jobTemplate) => {
+                    try {
+                        await this.sendNewMiningJob(jobTemplate);
+                    } catch (e) {
+                        await this.socket.end();
+                        console.error(e);
+                    }
+                },
+            );
 
         this.backgroundWork.push(
             setInterval(async () => {
                 await this.checkDifficulty();
-            }, 60 * 1000)
+            }, 60 * 1000),
         );
-
     }
 
     private async sendNewMiningJob(jobTemplate: IJobTemplate) {
@@ -338,11 +373,10 @@ export class StratumV1Client {
 
         const job = new MiningJob(
             this.stratumV1JobsService.getNextId(),
-            jobTemplate
+            jobTemplate,
         );
 
         this.stratumV1JobsService.addJob(job);
-
 
         const success = await this.write(job.response(jobTemplate));
         if (!success) {
@@ -350,9 +384,7 @@ export class StratumV1Client {
         }
     }
 
-
     private async handleMiningSubmission(submission: MiningSubmitMessage) {
-
         if (this.entity == null) {
             if (this.creatingEntity == null) {
                 this.creatingEntity = new Promise(async (resolve, reject) => {
@@ -363,7 +395,7 @@ export class StratumV1Client {
                             clientName: this.clientAuthorization.worker,
                             userAgent: this.clientSubscription.userAgent,
                             startTime: new Date(),
-                            bestDifficulty: 0
+                            bestDifficulty: 0,
                         });
                     } catch (e) {
                         reject(e);
@@ -371,12 +403,10 @@ export class StratumV1Client {
                     resolve();
                 });
                 await this.creatingEntity;
-
             } else {
                 await this.creatingEntity;
             }
         }
-
 
         const job = this.stratumV1JobsService.getJobById(submission.jobId);
 
@@ -385,14 +415,17 @@ export class StratumV1Client {
             const err = new StratumErrorMessage(
                 submission.id,
                 eStratumErrorCode.JobNotFound,
-                'Job not found').response();
+                'Job not found',
+            ).response();
             const success = await this.write(err);
             if (!success) {
                 return false;
             }
             return false;
         }
-        const jobTemplate = this.stratumV1JobsService.getJobTemplateById(job.jobTemplateId);
+        const jobTemplate = this.stratumV1JobsService.getJobTemplateById(
+            job.jobTemplateId,
+        );
 
         const versionMask = parseInt(submission.versionMask, 16);
         let version = 0x20000000;
@@ -400,7 +433,10 @@ export class StratumV1Client {
             version = version ^ versionMask;
         }
 
-        const xhashbuf = Buffer.from(this.extraNonceAndSessionId + submission.extraNonce2, 'hex');
+        const xhashbuf = Buffer.from(
+            this.extraNonceAndSessionId + submission.extraNonce2,
+            'hex',
+        );
         let extraDataHashed = this.doubleSHA256(xhashbuf);
         const versionBuffer = Buffer.alloc(4);
         versionBuffer.writeUInt32LE(jobTemplate.block.version);
@@ -408,18 +444,24 @@ export class StratumV1Client {
         try {
             comptokenProof = new compto.ComptokenProof(
                 Buffer.from(jobTemplate.block.transactions[0], 'hex'),
-                this.hexStringToLittleEndianBuffer(jobTemplate.block.currentblockhash),
+                this.hexStringToLittleEndianBuffer(
+                    jobTemplate.block.currentblockhash,
+                ),
                 extraDataHashed,
                 this.hexStringToLittleEndianBuffer(submission.nonce),
                 versionBuffer,
                 this.hexStringToLittleEndianBuffer(submission.ntime),
-            ); 
+            );
         } catch (e) {
-            if (e instanceof Error && e.message === 'The provided proof does not have enough zeroes') {
+            if (
+                e instanceof Error &&
+                e.message === 'The provided proof does not have enough zeroes'
+            ) {
                 const err = new StratumErrorMessage(
                     submission.id,
                     eStratumErrorCode.LowDifficultyShare,
-                    'Difficulty too low').response();
+                    'Difficulty too low',
+                ).response();
                 const success = await this.write(err);
                 if (!success) {
                     return false;
@@ -428,32 +470,55 @@ export class StratumV1Client {
             }
         }
 
-        let connection = new Connection("http://localhost:8899");
-        let testuser_compto_pubkey = getAssociatedTokenAddressSync(compto.comptoken_mint_pubkey, compto.test_account.publicKey, false, TOKEN_2022_PROGRAM_ID);
+        let connection = new Connection('http://localhost:8899');
+        let testuser_compto_pubkey = getAssociatedTokenAddressSync(
+            compto.comptoken_mint_pubkey,
+            compto.test_account.publicKey,
+            false,
+            TOKEN_2022_PROGRAM_ID,
+        );
         let mintComptokensTransaction = new Transaction();
         mintComptokensTransaction.add(
-            await compto.createProofSubmissionInstruction(comptokenProof, compto.test_account.publicKey, testuser_compto_pubkey),
+            await compto.createProofSubmissionInstruction(
+                comptokenProof,
+                compto.test_account.publicKey,
+                testuser_compto_pubkey,
+            ),
         );
 
-
-        let mintComptokensResult = await sendAndConfirmTransaction(connection, mintComptokensTransaction, [compto.test_account, compto.test_account]);
-        console.log("==================================================================================");
-        console.log("mintComptokens transaction confirmed", mintComptokensResult);
-        console.log("==================================================================================");
+        let mintComptokensResult = await sendAndConfirmTransaction(
+            connection,
+            mintComptokensTransaction,
+            [compto.test_account, compto.test_account],
+        );
+        console.log(
+            '==================================================================================',
+        );
+        console.log(
+            'mintComptokens transaction confirmed',
+            mintComptokensResult,
+        );
+        console.log(
+            '==================================================================================',
+        );
 
         await this.checkDifficulty();
         return true;
-
     }
 
     private doubleSHA256(data: Buffer): Buffer {
         const firstHash = crypto.createHash('sha256').update(data).digest();
-        const secondHash = crypto.createHash('sha256').update(firstHash).digest();
+        const secondHash = crypto
+            .createHash('sha256')
+            .update(firstHash)
+            .digest();
         return secondHash;
     }
 
     private async checkDifficulty() {
-        const targetDiff = this.statistics.getSuggestedDifficulty(this.sessionDifficulty);
+        const targetDiff = this.statistics.getSuggestedDifficulty(
+            this.sessionDifficulty,
+        );
         if (targetDiff == null) {
             return;
         }
@@ -461,21 +526,22 @@ export class StratumV1Client {
         if (targetDiff != this.sessionDifficulty) {
             this.sessionDifficulty = targetDiff;
 
-            const data = JSON.stringify({
-                id: null,
-                method: eResponseMethod.SET_DIFFICULTY,
-                params: [targetDiff]
-            }) + '\n';
-
+            const data =
+                JSON.stringify({
+                    id: null,
+                    method: eResponseMethod.SET_DIFFICULTY,
+                    params: [targetDiff],
+                }) + '\n';
 
             await this.socket.write(data);
             console.log('start to await newMiningJob$.');
-            const jobTemplate = await firstValueFrom(this.stratumV1JobsService.newMiningJob$);
+            const jobTemplate = await firstValueFrom(
+                this.stratumV1JobsService.newMiningJob$,
+            );
             console.log('finish await newMiningJob$');
             // we need to clear the jobs so that the difficulty set takes effect. Otherwise the different miner implementations can cause issues
             jobTemplate.blockData.clearJobs = true;
             await this.sendNewMiningJob(jobTemplate);
-
         }
     }
 
@@ -484,34 +550,34 @@ export class StratumV1Client {
         if (hexString.startsWith('0x') || hexString.startsWith('0X')) {
             hexString = hexString.slice(2);
         }
-    
+
         // Ensure hex string length is even (full bytes)
         if (hexString.length % 2 !== 0) {
             hexString = '0' + hexString; // Pad with leading zero
         }
-    
+
         // Split hex string into an array of bytes (two hex characters each)
         const bytes = hexString.match(/.{2}/g);
         if (!bytes) {
             return Buffer.alloc(0); // Return empty buffer if no bytes
         }
-    
+
         const wordSize = 4; // Word size in bytes (e.g., 4 bytes for 32-bit word)
         const bufferArray: number[] = [];
-    
+
         for (let i = 0; i < bytes.length; i += wordSize) {
             // Get the next word's bytes
             const wordBytes = bytes.slice(i, i + wordSize);
-    
+
             // Reverse the bytes within the word for little-endian representation
             const reversedWordBytes = wordBytes.reverse();
-    
+
             // Convert the hex strings to numbers and add to buffer array
-            reversedWordBytes.forEach(byteStr => {
+            reversedWordBytes.forEach((byteStr) => {
                 bufferArray.push(parseInt(byteStr, 16));
             });
         }
-    
+
         // Create a Buffer from the array of bytes
         return Buffer.from(bufferArray);
     }
@@ -520,7 +586,6 @@ export class StratumV1Client {
         console.log('Writing message: ', message);
         try {
             if (!this.socket.destroyed && !this.socket.writableEnded) {
-
                 await new Promise((resolve, reject) => {
                     this.socket.write(message, (error) => {
                         if (error) {
@@ -533,7 +598,9 @@ export class StratumV1Client {
 
                 return true;
             } else {
-                console.error(`Error: Cannot write to closed or ended socket. ${this.extraNonceAndSessionId} ${message}`);
+                console.error(
+                    `Error: Cannot write to closed or ended socket. ${this.extraNonceAndSessionId} ${message}`,
+                );
                 this.destroy();
                 if (!this.socket.destroyed) {
                     this.socket.destroy();
@@ -547,7 +614,10 @@ export class StratumV1Client {
             } else if (!this.socket.destroyed) {
                 this.socket.destroy();
             }
-            console.error(`Error occurred while writing to socket: ${this.extraNonceAndSessionId}`, error);
+            console.error(
+                `Error occurred while writing to socket: ${this.extraNonceAndSessionId}`,
+                error,
+            );
             return false;
         }
     }

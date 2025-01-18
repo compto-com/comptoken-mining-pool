@@ -4,11 +4,10 @@ import { TrackedEntity } from '../utils/TrackedEntity.entity';
 
 @Entity()
 //Index for getHashRateForSession
-@Index(["address", "clientName", "sessionId"])
+@Index(['address', 'clientName', 'sessionId'])
 //Index for statistics save
-@Index(["address", "clientName", "sessionId", "time"])
+@Index(['address', 'clientName', 'sessionId', 'time'])
 export class ClientStatisticsEntity extends TrackedEntity {
-
     @PrimaryGeneratedColumn()
     id: number;
 
@@ -30,6 +29,4 @@ export class ClientStatisticsEntity extends TrackedEntity {
 
     @Column({ default: 0, type: 'integer' })
     acceptedCount: number;
-
-
 }

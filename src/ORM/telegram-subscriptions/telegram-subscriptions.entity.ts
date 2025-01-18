@@ -4,7 +4,6 @@ import { TrackedEntity } from '../utils/TrackedEntity.entity';
 
 @Entity()
 export class TelegramSubscriptionsEntity extends TrackedEntity {
-
     @PrimaryGeneratedColumn()
     id: number;
 
@@ -14,6 +13,4 @@ export class TelegramSubscriptionsEntity extends TrackedEntity {
 
     @Column()
     telegramChatId: number;
-
-
 }

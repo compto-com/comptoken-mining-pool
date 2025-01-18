@@ -1,20 +1,26 @@
 import { Injectable } from '@nestjs/common';
-import * as bitcoinjs from 'bitcoinjs-lib';
-import * as merkle from 'merkle-lib';
-import * as merkleProof from 'merkle-lib/proof';
-import { combineLatest, delay, filter, from, of, interval, map, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
+import {
+    combineLatest,
+    delay,
+    filter,
+    interval,
+    map,
+    Observable,
+    of,
+    shareReplay,
+    startWith,
+    switchMap,
+    tap,
+} from 'rxjs';
 
+import { IComptoBlockTemplate } from '../models/bitcoin-rpc/ComptoBlockTemplate';
 import { MiningJob } from '../models/MiningJob';
 import { BitcoinRpcService } from './bitcoin-rpc.service';
-import { IComptoBlockTemplate } from '../models/bitcoin-rpc/ComptoBlockTemplate';
-
-
 
 export interface IJobTemplate {
-
     block: IComptoBlockTemplate;
     blockData: {
-        id: string,
+        id: string;
         // coinbasevalue: number;
         networkDifficulty: number;
         // height: number;
@@ -24,7 +30,6 @@ export interface IJobTemplate {
 
 @Injectable()
 export class StratumV1JobsService {
-
     private lastIntervalCount: number;
     private skipNext: boolean = false;
     public newMiningJob$: Observable<IJobTemplate>;
@@ -37,28 +42,34 @@ export class StratumV1JobsService {
     public blocks: { [id: number]: IJobTemplate } = {};
 
     // offset the interval so that all the cluster processes don't try and refresh at the same time.
-    private delay = process.env.NODE_APP_INSTANCE == null ? 0 : parseInt(process.env.NODE_APP_INSTANCE) * 5000;
+    private delay =
+        process.env.NODE_APP_INSTANCE == null
+            ? 0
+            : parseInt(process.env.NODE_APP_INSTANCE) * 5000;
 
-    constructor(
-        private readonly bitcoinRpcService: BitcoinRpcService
-    ) {
-
-        this.newMiningJob$ = combineLatest([this.bitcoinRpcService.newBlock$, interval(60000).pipe(delay(this.delay), startWith(-1))]).pipe(
+    constructor(private readonly bitcoinRpcService: BitcoinRpcService) {
+        this.newMiningJob$ = combineLatest([
+            this.bitcoinRpcService.newBlock$,
+            interval(60000).pipe(delay(this.delay), startWith(-1)),
+        ]).pipe(
             switchMap(([miningInfo, interval]) => {
-                return of(this.bitcoinRpcService.getBlockTemplate(miningInfo)).pipe(map((blockTemplate) => {
-                    return {
-                        blockTemplate,
-                        interval
-                    }
-                }))
+                return of(
+                    this.bitcoinRpcService.getBlockTemplate(miningInfo),
+                ).pipe(
+                    map((blockTemplate) => {
+                        return {
+                            blockTemplate,
+                            interval,
+                        };
+                    }),
+                );
             }),
             map(({ blockTemplate, interval }) => {
-
                 let clearJobs = false;
                 if (this.lastIntervalCount === interval) {
                     clearJobs = true;
                     this.skipNext = true;
-                    console.log('new block')
+                    console.log('new block');
                 }
 
                 if (this.skipNext == true && clearJobs == false) {
@@ -71,76 +82,20 @@ export class StratumV1JobsService {
                 const id = this.getNextTemplateId();
                 this.latestJobTemplateId++;
 
-
                 const comptoJob: IJobTemplate = {
                     block: blockTemplate,
                     blockData: {
                         id,
-                        networkDifficulty: this.calculateNetworkDifficulty(parseInt(blockTemplate.bits, 16)),
+                        networkDifficulty: this.calculateNetworkDifficulty(
+                            parseInt(blockTemplate.bits, 16),
+                        ),
                         clearJobs,
-                    }
-                }
+                    },
+                };
                 return comptoJob;
-                // return {
-                //     version: blockTemplate.version,
-                //     bits: parseInt(blockTemplate.bits, 16),
-                //     prevHash: this.convertToLittleEndian(blockTemplate.currentblockhash),
-                //     transactions: blockTemplate.transactions,
-                //     timestamp: ,
-                //     networkDifficulty: this.calculateNetworkDifficulty(parseInt(blockTemplate.bits, 16)),
-                //     clearJobs,
-                // };
-
-                // return {
-                //     block,
-                //     transactions,
-                //     blockData: {
-                //         id,
-                //         networkDifficulty,
-                //         clearJobs
-                //     }
-                // }
             }),
-            filter(next => next != null),
-            // map(({ version, bits, prevHash, transactions, timestamp, networkDifficulty, clearJobs }) => {
-            //     // const block = new bitcoinjs.Block();
+            filter((next) => next != null),
 
-            //     //create an empty coinbase tx
-            //     // const tempCoinbaseTx = new bitcoinjs.Transaction();
-            //     // tempCoinbaseTx.version = 2;
-            //     // tempCoinbaseTx.addInput(Buffer.alloc(32, 0), 0xffffffff, 0xffffffff);
-            //     // tempCoinbaseTx.ins[0].witness = [Buffer.alloc(32, 0)];
-            //     // transactions.unshift(tempCoinbaseTx);
-
-            //     // const transactionBuffers = transactions.map(tx => tx.getHash(false));
-
-            //     // const merkleTree = merkle(transactionBuffers, bitcoinjs.crypto.hash256);
-            //     // const merkleBranches: Buffer[] = merkleProof(merkleTree, transactionBuffers[0]).filter(h => h != null);
-            //     // block.merkleRoot = merkleBranches.pop();
-
-            //     // remove the first (coinbase) and last (root) element from the branch
-            //     // const merkle_branch = merkleBranches.slice(1, merkleBranches.length).map(b => b.toString('hex'))
-
-            //     block.prevHash = prevHash;
-            //     block.version = version;
-            //     block.bits = bits;
-            //     block.timestamp = timestamp;
-
-            //     // block.transactions = transactions;
-            //     // block.witnessCommit = bitcoinjs.Block.calculateMerkleRoot(transactions, true);
-
-            //     // const id = this.getNextTemplateId();
-            //     // this.latestJobTemplateId++;
-            //     return {
-            //         block,
-            //         transactions,
-            //         blockData: {
-            //             id,
-            //             networkDifficulty,
-            //             clearJobs
-            //         }
-            //     }
-            // }),
             tap((data) => {
                 if (data.blockData.clearJobs) {
                     this.blocks = {};
@@ -148,26 +103,20 @@ export class StratumV1JobsService {
                 }
                 this.blocks[data.blockData.id] = data;
             }),
-            shareReplay({ refCount: true, bufferSize: 1 })
-        )
+            shareReplay({ refCount: true, bufferSize: 1 }),
+        );
     }
 
     private calculateNetworkDifficulty(nBits: number) {
-        const mantissa: number = nBits & 0x007fffff;       // Extract the mantissa from nBits
-        const exponent: number = (nBits >> 24) & 0xff;       // Extract the exponent from nBits
+        const mantissa: number = nBits & 0x007fffff; // Extract the mantissa from nBits
+        const exponent: number = (nBits >> 24) & 0xff; // Extract the exponent from nBits
 
-        const target: number = mantissa * Math.pow(256, (exponent - 3));   // Calculate the target value
+        const target: number = mantissa * Math.pow(256, exponent - 3); // Calculate the target value
 
-        const difficulty: number = (Math.pow(2, 208) * 65535) / target;    // Calculate the difficulty
+        const difficulty: number = (Math.pow(2, 208) * 65535) / target; // Calculate the difficulty
 
         console.log(`Network Difficulty: ${difficulty}`);
         return difficulty;
-    }
-
-    private convertToLittleEndian(hash: string): Buffer {
-        const bytes = Buffer.from(hash, 'hex');
-        Array.prototype.reverse.call(bytes);
-        return bytes;
     }
 
     public getJobTemplateById(jobTemplateId: string): IJobTemplate | null {
@@ -189,6 +138,4 @@ export class StratumV1JobsService {
     public getNextId() {
         return this.latestJobId.toString(16);
     }
-
-
 }

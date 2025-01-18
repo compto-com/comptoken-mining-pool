@@ -4,7 +4,6 @@ import { TrackedEntity } from '../utils/TrackedEntity.entity';
 
 @Entity()
 export class AddressSettingsEntity extends TrackedEntity {
-
     @PrimaryColumn({ length: 62, type: 'varchar' })
     address: string;
 
@@ -19,6 +18,4 @@ export class AddressSettingsEntity extends TrackedEntity {
 
     @Column({ nullable: true })
     bestDifficultyUserAgent: string;
-
 }
-
