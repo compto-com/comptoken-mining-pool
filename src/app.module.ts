@@ -14,12 +14,9 @@ import { BlocksModule } from './ORM/blocks/blocks.module';
 import { ClientStatisticsModule } from './ORM/client-statistics/client-statistics.module';
 import { ClientModule } from './ORM/client/client.module';
 import { RpcBlocksModule } from './ORM/rpc-block/rpc-block.module';
-import { TelegramSubscriptionsModule } from './ORM/telegram-subscriptions/telegram-subscriptions.module';
 import { AppService } from './services/app.service';
-import { BitcoinRpcService } from './services/bitcoin-rpc.service';
 import { BTCPayService } from './services/btc-pay.service';
-import { DiscordService } from './services/discord.service';
-import { NotificationService } from './services/notification.service';
+import { ComptoRpcService } from './services/compto-rpc.service';
 import { StratumV1JobsService } from './services/stratum-v1-jobs.service';
 import { StratumV1Service } from './services/stratum-v1.service';
 
@@ -27,7 +24,6 @@ const ORMModules = [
     ClientStatisticsModule,
     ClientModule,
     AddressSettingsModule,
-    TelegramSubscriptionsModule,
     BlocksModule,
     RpcBlocksModule,
 ];
@@ -51,11 +47,9 @@ const ORMModules = [
     ],
     controllers: [AppController, ClientController, AddressController],
     providers: [
-        DiscordService,
         AppService,
         StratumV1Service,
-        BitcoinRpcService,
-        NotificationService,
+        ComptoRpcService,
         ComptokenAddressValidator,
         StratumV1JobsService,
         BTCPayService,

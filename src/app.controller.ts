@@ -7,7 +7,7 @@ import { AddressSettingsService } from './ORM/address-settings/address-settings.
 import { BlocksService } from './ORM/blocks/blocks.service';
 import { ClientStatisticsService } from './ORM/client-statistics/client-statistics.service';
 import { ClientService } from './ORM/client/client.service';
-import { BitcoinRpcService } from './services/bitcoin-rpc.service';
+import { ComptoRpcService } from './services/compto-rpc.service';
 
 @Controller()
 export class AppController {
@@ -18,7 +18,7 @@ export class AppController {
         private readonly clientService: ClientService,
         private readonly clientStatisticsService: ClientStatisticsService,
         private readonly blocksService: BlocksService,
-        private readonly bitcoinRpcService: BitcoinRpcService,
+        private readonly comptoRpcService: ComptoRpcService,
         private readonly addressSettingsService: AddressSettingsService,
     ) {}
 
@@ -51,7 +51,7 @@ export class AppController {
     @Get('network')
     public async network() {
         const miningInfo = await firstValueFrom(
-            this.bitcoinRpcService.newBlock$,
+            this.comptoRpcService.newBlock$,
         );
         return miningInfo;
     }

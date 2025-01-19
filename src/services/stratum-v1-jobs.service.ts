@@ -13,9 +13,9 @@ import {
     tap,
 } from 'rxjs';
 
-import { IComptoBlockTemplate } from '../models/bitcoin-rpc/ComptoBlockTemplate';
+import { IComptoBlockTemplate } from '../models/compto-rpc/ComptoBlockTemplate';
 import { MiningJob } from '../models/MiningJob';
-import { BitcoinRpcService } from './bitcoin-rpc.service';
+import { ComptoRpcService } from './compto-rpc.service';
 
 export interface IJobTemplate {
     block: IComptoBlockTemplate;
@@ -45,14 +45,14 @@ export class StratumV1JobsService {
             ? 0
             : parseInt(process.env.NODE_APP_INSTANCE) * 5000;
 
-    constructor(private readonly bitcoinRpcService: BitcoinRpcService) {
+    constructor(private readonly comptoRpcService: ComptoRpcService) {
         this.newMiningJob$ = combineLatest([
-            this.bitcoinRpcService.newBlock$,
+            this.comptoRpcService.newBlock$,
             interval(60000).pipe(delay(this.delay), startWith(-1)),
         ]).pipe(
             switchMap(([miningInfo, interval]) => {
                 return of(
-                    this.bitcoinRpcService.getBlockTemplate(miningInfo),
+                    this.comptoRpcService.getBlockTemplate(miningInfo),
                 ).pipe(
                     map((blockTemplate) => {
                         return {

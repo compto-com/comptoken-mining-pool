@@ -15,6 +15,7 @@ import {
     sendAndConfirmTransaction,
     Transaction,
 } from '@solana/web3.js';
+import { ComptoRpcService } from 'src/services/compto-rpc.service';
 import { ClientStatisticsService } from '../ORM/client-statistics/client-statistics.service';
 import { ClientEntity } from '../ORM/client/client.entity';
 import { ClientService } from '../ORM/client/client.service';
@@ -61,6 +62,7 @@ export class StratumV1Client {
         private readonly stratumV1JobsService: StratumV1JobsService,
         private readonly clientService: ClientService,
         private readonly clientStatisticsService: ClientStatisticsService,
+        private readonly comptoRpcService: ComptoRpcService,
     ) {
         console.log('StratumV1Client created');
         this.socket.on('data', (data: Buffer) => {
@@ -470,7 +472,6 @@ export class StratumV1Client {
             }
         }
 
-        let connection = new Connection('http://localhost:8899');
         let testuser_compto_pubkey = getAssociatedTokenAddressSync(
             compto.comptoken_mint_pubkey,
             compto.test_account.publicKey,
@@ -487,7 +488,7 @@ export class StratumV1Client {
         );
 
         let mintComptokensResult = await sendAndConfirmTransaction(
-            connection,
+            this.comptoRpcService.connection,
             mintComptokensTransaction,
             [compto.test_account, compto.test_account],
         );

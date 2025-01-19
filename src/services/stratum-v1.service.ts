@@ -4,6 +4,7 @@ import { Server, Socket } from 'net';
 import { StratumV1Client } from '../models/StratumV1Client';
 import { ClientStatisticsService } from '../ORM/client-statistics/client-statistics.service';
 import { ClientService } from '../ORM/client/client.service';
+import { ComptoRpcService } from './compto-rpc.service';
 import { StratumV1JobsService } from './stratum-v1-jobs.service';
 
 @Injectable()
@@ -12,6 +13,7 @@ export class StratumV1Service implements OnModuleInit {
         private readonly clientService: ClientService,
         private readonly clientStatisticsService: ClientStatisticsService,
         private readonly stratumV1JobsService: StratumV1JobsService,
+        private readonly comptoRpcService: ComptoRpcService,
     ) {}
 
     async onModuleInit(): Promise<void> {
@@ -33,6 +35,7 @@ export class StratumV1Service implements OnModuleInit {
                 this.stratumV1JobsService,
                 this.clientService,
                 this.clientStatisticsService,
+                this.comptoRpcService,
             );
 
             socket.on('close', async (hadError: boolean) => {
