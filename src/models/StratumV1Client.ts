@@ -10,15 +10,11 @@ import {
     getAssociatedTokenAddressSync,
     TOKEN_2022_PROGRAM_ID,
 } from '@solana/spl-token';
-import {
-    Connection,
-    sendAndConfirmTransaction,
-    Transaction,
-} from '@solana/web3.js';
-import { ComptoRpcService } from 'src/services/compto-rpc.service';
+import { sendAndConfirmTransaction, Transaction } from '@solana/web3.js';
 import { ClientStatisticsService } from '../ORM/client-statistics/client-statistics.service';
 import { ClientEntity } from '../ORM/client/client.entity';
 import { ClientService } from '../ORM/client/client.service';
+import { ComptoRpcService } from '../services/compto-rpc.service';
 import {
     IJobTemplate,
     StratumV1JobsService,

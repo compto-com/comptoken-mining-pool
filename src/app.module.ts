@@ -6,7 +6,6 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AppController } from './app.controller';
-import { AddressController } from './controllers/address/address.controller';
 import { ClientController } from './controllers/client/client.controller';
 import { ComptokenAddressValidator } from './models/validators/bitcoin-address.validator';
 import { AddressSettingsModule } from './ORM/address-settings/address-settings.module';
@@ -45,7 +44,7 @@ const ORMModules = [
         HttpModule,
         ...ORMModules,
     ],
-    controllers: [AppController, ClientController, AddressController],
+    controllers: [AppController, ClientController],
     providers: [
         AppService,
         StratumV1Service,
