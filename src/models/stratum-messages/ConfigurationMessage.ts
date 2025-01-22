@@ -4,7 +4,6 @@ import { eRequestMethod } from '../enums/eRequestMethod';
 import { StratumBaseMessage } from './StratumBaseMessage';
 
 export class ConfigurationMessage extends StratumBaseMessage {
-
     @IsArray()
     params: string[];
 
@@ -19,7 +18,7 @@ export class ConfigurationMessage extends StratumBaseMessage {
             error: null,
             result: {
                 'version-rolling': true,
-                'version-rolling.mask': '1fffe000'
+                'version-rolling.mask': '1fffe000',
             },
         };
     }

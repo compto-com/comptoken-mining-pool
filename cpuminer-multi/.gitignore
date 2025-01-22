@@ -49,3 +49,5 @@ config.sub
 # sign.sh
 
 # compat/curl-for-windows/
+
+cpuminer

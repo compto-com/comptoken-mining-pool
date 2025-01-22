@@ -3,37 +3,33 @@ import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class BTCPayService {
-
-    constructor(private readonly httpService: HttpService) {
-
-    }
-
+    constructor(private readonly httpService: HttpService) {}
 
     public createUser() {
-
         const user = {
             email: 'MyTestUser@gmail.com',
             password: 'NOTVERYSECURE',
-            isAdministrator: false
-        }
+            isAdministrator: false,
+        };
 
-        this.httpService.post(`/api/v1/users`, user)
+        this.httpService.post(`/api/v1/users`, user);
     }
 
     public createNewStore() {
         const token = 'APIKEYTOKEN';
         const store = {
-            Name: 'STORENAME'
-        }
+            Name: 'STORENAME',
+        };
 
-        this.httpService.post(`/api/v1/stores`, store, { headers: { Authorization: 'token ' + token } })
+        this.httpService.post(`/api/v1/stores`, store, {
+            headers: { Authorization: 'token ' + token },
+        });
     }
 
     public createPullPayment() {
         const token = 'APIKEYTOKEN';
 
         const pullPayment = {
-
             name: 'string',
             description: 'string',
             amount: '0.1',
@@ -43,12 +39,13 @@ export class BTCPayService {
             autoApproveClaims: false,
             startsAt: 1592312018,
             expiresAt: 1593129600,
-            paymentMethods: [
-                'BTC'
-            ]
+            paymentMethods: ['BTC'],
+        };
 
-        }
-
-        this.httpService.post(`/api/v1/stores/{storeId}/pull-payments`, pullPayment, { headers: { Authorization: 'token ' + token } })
+        this.httpService.post(
+            `/api/v1/stores/{storeId}/pull-payments`,
+            pullPayment,
+            { headers: { Authorization: 'token ' + token } },
+        );
     }
 }

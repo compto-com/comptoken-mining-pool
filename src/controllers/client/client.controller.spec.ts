@@ -7,31 +7,30 @@ import { ClientModule } from '../../ORM/client/client.module';
 import { ClientController } from './client.controller';
 
 describe('ClientController', () => {
-  let controller: ClientController;
+    let controller: ClientController;
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      imports: [
-        TypeOrmModule.forRoot({
-          type: 'sqlite',
-          database: './DB/public-pool.test.sqlite',
-          synchronize: true,
-          autoLoadEntities: true,
-          cache: true,
-          logging: false
-        }),
-        AddressSettingsModule,
-        ClientModule,
-        ClientStatisticsModule
-      ],
-      controllers: [ClientController],
+    beforeEach(async () => {
+        const module: TestingModule = await Test.createTestingModule({
+            imports: [
+                TypeOrmModule.forRoot({
+                    type: 'sqlite',
+                    database: './DB/public-pool.test.sqlite',
+                    synchronize: true,
+                    autoLoadEntities: true,
+                    cache: true,
+                    logging: false,
+                }),
+                AddressSettingsModule,
+                ClientModule,
+                ClientStatisticsModule,
+            ],
+            controllers: [ClientController],
+        }).compile();
 
-    }).compile();
+        controller = module.get<ClientController>(ClientController);
+    });
 
-    controller = module.get<ClientController>(ClientController);
-  });
-
-  it('should be defined', () => {
-    expect(controller).toBeDefined();
-  });
+    it('should be defined', () => {
+        expect(controller).toBeDefined();
+    });
 });

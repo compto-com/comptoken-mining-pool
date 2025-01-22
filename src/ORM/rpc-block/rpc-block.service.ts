@@ -8,32 +8,36 @@ import { RpcBlockEntity } from './rpc-block.entity';
 export class RpcBlockService {
     constructor(
         @InjectRepository(RpcBlockEntity)
-        private rpcBlockRepository: Repository<RpcBlockEntity>
-    ) {
-
-    }
+        private rpcBlockRepository: Repository<RpcBlockEntity>,
+    ) {}
     public getBlock(blockHeight: number) {
         return this.rpcBlockRepository.findOne({
-            where: { blockHeight }
+            where: { blockHeight },
         });
     }
 
     public lockBlock(blockHeight: number, process: string) {
-        return this.rpcBlockRepository.save({ blockHeight, data: null, lockedBy: process });
+        return this.rpcBlockRepository.save({
+            blockHeight,
+            data: null,
+            lockedBy: process,
+        });
     }
 
     public saveBlock(blockHeight: number, data: string) {
-        return this.rpcBlockRepository.update(blockHeight, { data })
+        return this.rpcBlockRepository.update(blockHeight, { data });
     }
 
     public async deleteOldBlocks() {
-        const result = await this.rpcBlockRepository.createQueryBuilder('entity')
+        const result = await this.rpcBlockRepository
+            .createQueryBuilder('entity')
             .select('MAX(entity.blockHeight)', 'maxNumber')
             .getRawOne();
 
         const newestBlock = result ? result.maxNumber : null;
 
-        await this.rpcBlockRepository.createQueryBuilder()
+        await this.rpcBlockRepository
+            .createQueryBuilder()
             .delete()
             .where('"blockHeight" < :newestBlock', { newestBlock })
             .execute();

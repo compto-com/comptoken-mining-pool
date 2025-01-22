@@ -4,7 +4,6 @@ import { TrackedEntity } from '../utils/TrackedEntity.entity';
 
 @Entity()
 export class BlocksEntity extends TrackedEntity {
-
     @PrimaryGeneratedColumn()
     id: number;
 
@@ -22,5 +21,4 @@ export class BlocksEntity extends TrackedEntity {
 
     @Column()
     blockData: string;
-
 }

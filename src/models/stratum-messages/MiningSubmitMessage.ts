@@ -5,7 +5,6 @@ import { eRequestMethod } from '../enums/eRequestMethod';
 import { StratumBaseMessage } from './StratumBaseMessage';
 
 export class MiningSubmitMessage extends StratumBaseMessage {
-
     @IsArray()
     @ArrayMinSize(5)
     @ArrayMaxSize(6)
@@ -40,7 +39,7 @@ export class MiningSubmitMessage extends StratumBaseMessage {
     @Transform(({ value, key, obj, type }) => {
         return obj.params[4];
     })
-    public nonce: string
+    public nonce: string;
 
     @Expose()
     @IsString()
@@ -54,18 +53,11 @@ export class MiningSubmitMessage extends StratumBaseMessage {
         this.method = eRequestMethod.AUTHORIZE;
     }
 
-
     public response() {
         return {
             id: this.id,
             error: null,
-            result: true
+            result: true,
         };
     }
-
-
-
-
-
-
 }

@@ -1,22 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 
 import { BlocksEntity } from './blocks.entity';
 
-
 @Injectable()
 export class BlocksService {
-
     constructor(
-
-        private dataSource: DataSource,
         @InjectRepository(BlocksEntity)
         private blocksRepository: Repository<BlocksEntity>,
-    ) {
-
-    }
-
+    ) {}
 
     public async save(block: Partial<BlocksEntity>) {
         await this.blocksRepository.save(block);
@@ -28,8 +21,8 @@ export class BlocksService {
                 height: true,
                 minerAddress: true,
                 worker: true,
-                sessionId: true
-            }
+                sessionId: true,
+            },
         });
     }
 
@@ -39,11 +32,11 @@ export class BlocksService {
                 height: true,
                 minerAddress: true,
                 worker: true,
-                sessionId: true
+                sessionId: true,
             },
             where: {
-                minerAddress: address
-            }
+                minerAddress: address,
+            },
         });
     }
 }

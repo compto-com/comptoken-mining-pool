@@ -1,8 +1,8 @@
 import { eResponseMethod } from '../enums/eResponseMethod';
 
 export interface IMiningNotify {
-    id: null,
-    method: eResponseMethod.MINING_NOTIFY,
+    id: null;
+    method: eResponseMethod.MINING_NOTIFY;
     params: [
         string, // jobId 0
         string, // prevHash 1
@@ -12,6 +12,6 @@ export interface IMiningNotify {
         string, // version 5
         string, // bits 6
         string, // timestamp 7
-        boolean // clear jobs 8
-    ]
+        boolean, // clear jobs 8
+    ];
 }

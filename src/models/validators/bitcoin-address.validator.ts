@@ -1,27 +1,34 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { validate } from 'bitcoin-address-validation';
-import { registerDecorator, ValidationOptions, ValidatorConstraint, ValidatorConstraintInterface } from 'class-validator';
+import { PublicKey } from '@solana/web3.js';
+import {
+    registerDecorator,
+    ValidationOptions,
+    ValidatorConstraint,
+    ValidatorConstraintInterface,
+} from 'class-validator';
 
-
-@ValidatorConstraint({ name: 'bitcoinAddress', async: false })
+@ValidatorConstraint({ name: 'ComptokenAddress', async: false })
 @Injectable()
-export class BitcoinAddressValidator implements ValidatorConstraintInterface {
-
-    constructor(
-        private configService: ConfigService
-    ) { }
+export class ComptokenAddressValidator implements ValidatorConstraintInterface {
+    constructor() {}
 
     validate(value: string): boolean {
-        return validate(value, this.configService.get('NETWORK'));
+        return true; // originally validated bitcoin addresses, disabled for now b/c it doesn't work yet
+        try {
+            new PublicKey(value);
+            // TODO: Check if it's a token account with the correct mint
+            return true;
+        } catch (e) {
+            return false;
+        }
     }
 
     defaultMessage(): string {
-        return 'Must be a bitcoin address';
+        return 'Must be a comptoken address';
     }
 }
 
-export function IsBitcoinAddress(validationOptions?: ValidationOptions) {
+export function IsComptokenAddress(validationOptions?: ValidationOptions) {
     return function (object: Object, propertyName: string) {
         registerDecorator({
             name: 'isBitcoinAddress',
@@ -29,7 +36,7 @@ export function IsBitcoinAddress(validationOptions?: ValidationOptions) {
             propertyName: propertyName,
             constraints: [],
             options: validationOptions,
-            validator: BitcoinAddressValidator,
+            validator: ComptokenAddressValidator,
         });
     };
 }

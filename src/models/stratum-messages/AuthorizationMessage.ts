@@ -1,12 +1,18 @@
 import { Expose, Transform } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+    ArrayMaxSize,
+    ArrayMinSize,
+    IsArray,
+    IsOptional,
+    IsString,
+    MaxLength,
+} from 'class-validator';
 
 import { eRequestMethod } from '../enums/eRequestMethod';
-import { IsBitcoinAddress } from '../validators/bitcoin-address.validator';
+import { IsComptokenAddress } from '../validators/bitcoin-address.validator';
 import { StratumBaseMessage } from './StratumBaseMessage';
 
 export class AuthorizationMessage extends StratumBaseMessage {
-
     @IsArray()
     @ArrayMinSize(2)
     @ArrayMaxSize(2)
@@ -17,17 +23,18 @@ export class AuthorizationMessage extends StratumBaseMessage {
     @Transform(({ value, key, obj, type }) => {
         return obj.params[0].split('.')[0];
     })
-    @IsBitcoinAddress()
+    @IsComptokenAddress()
     public address: string;
 
     @Expose()
     @IsString()
     @MaxLength(64)
     @Transform(({ value, key, obj, type }) => {
-        return obj.params[0].split('.')[1] == null ? 'worker' : obj.params[0].split('.')[1];
+        return obj.params[0].split('.')[1] == null
+            ? 'worker'
+            : obj.params[0].split('.')[1];
     })
     public worker: string;
-
 
     @Expose()
     @IsString()
@@ -41,15 +48,13 @@ export class AuthorizationMessage extends StratumBaseMessage {
     constructor() {
         super();
         this.method = eRequestMethod.AUTHORIZE;
-
     }
-
 
     public response() {
         return {
             id: this.id,
             error: null,
-            result: true
+            result: true,
         };
     }
 }

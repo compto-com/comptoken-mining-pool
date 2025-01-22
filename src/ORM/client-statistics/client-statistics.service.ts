@@ -4,33 +4,27 @@ import { Repository } from 'typeorm';
 
 import { ClientStatisticsEntity } from './client-statistics.entity';
 
-
 @Injectable()
 export class ClientStatisticsService {
-
     constructor(
-
-
         @InjectRepository(ClientStatisticsEntity)
         private clientStatisticsRepository: Repository<ClientStatisticsEntity>,
-    ) {
-
-    }
+    ) {}
 
     public async update(clientStatistic: Partial<ClientStatisticsEntity>) {
-
-        await this.clientStatisticsRepository.update({
-            address: clientStatistic.address,
-            clientName: clientStatistic.clientName,
-            sessionId: clientStatistic.sessionId,
-            time: clientStatistic.time
-        },
+        await this.clientStatisticsRepository.update(
+            {
+                address: clientStatistic.address,
+                clientName: clientStatistic.clientName,
+                sessionId: clientStatistic.sessionId,
+                time: clientStatistic.time,
+            },
             {
                 shares: clientStatistic.shares,
                 acceptedCount: clientStatistic.acceptedCount,
-                updatedAt: new Date()
-            });
-
+                updatedAt: new Date(),
+            },
+        );
     }
     public async insert(clientStatistic: Partial<ClientStatisticsEntity>) {
         // If no rows were updated, insert a new record
@@ -49,8 +43,7 @@ export class ClientStatisticsService {
     }
 
     public async getChartDataForSite() {
-
-        var yesterday = new Date(new Date().getTime() - (24 * 60 * 60 * 1000));
+        var yesterday = new Date(new Date().getTime() - 24 * 60 * 60 * 1000);
 
         const query = `
             SELECT
@@ -68,41 +61,20 @@ export class ClientStatisticsService {
 
     `;
 
-        const result: any[] = await this.clientStatisticsRepository.query(query);
+        const result: any[] = await this.clientStatisticsRepository.query(
+            query,
+        );
 
-
-        return result.map(res => {
-            res.label = new Date(res.label).toISOString();
-            return res;
-        }).slice(0, result.length - 1)
-
+        return result
+            .map((res) => {
+                res.label = new Date(res.label).toISOString();
+                return res;
+            })
+            .slice(0, result.length - 1);
     }
 
-
-    // public async getHashRateForAddress(address: string) {
-
-    //     const oneHour = new Date(new Date().getTime() - (60 * 60 * 1000));
-
-    //     const query = `
-    //         SELECT
-    //         SUM(entry.shares) AS difficultySum
-    //         FROM
-    //             client_statistics_entity AS entry
-    //         WHERE
-    //             entry.address = ? AND entry.time > ${oneHour}
-    //     `;
-
-    //     const result = await this.clientStatisticsRepository.query(query, [address]);
-
-    //     const difficultySum = result[0].difficultySum;
-
-    //     return (difficultySum * 4294967296) / (600);
-
-    // }
-
     public async getChartDataForAddress(address: string) {
-
-        var yesterday = new Date(new Date().getTime() - (24 * 60 * 60 * 1000));
+        var yesterday = new Date(new Date().getTime() - 24 * 60 * 60 * 1000);
 
         const query = `
                 SELECT
@@ -120,20 +92,20 @@ export class ClientStatisticsService {
 
         `;
 
-        const result = await this.clientStatisticsRepository.query(query, [address]);
+        const result = await this.clientStatisticsRepository.query(query, [
+            address,
+        ]);
 
-        return result.map(res => {
-            res.label = new Date(res.label).toISOString();
-            return res;
-        }).slice(0, result.length - 1);
-
-
+        return result
+            .map((res) => {
+                res.label = new Date(res.label).toISOString();
+                return res;
+            })
+            .slice(0, result.length - 1);
     }
 
-
     public async getHashRateForGroup(address: string, clientName: string) {
-
-        var oneHour = new Date(new Date().getTime() - (60 * 60 * 1000));
+        var oneHour = new Date(new Date().getTime() - 60 * 60 * 1000);
 
         const query = `
             SELECT
@@ -144,17 +116,18 @@ export class ClientStatisticsService {
                 entry.address = ? AND entry.clientName = ? AND entry.time > ${oneHour.getTime()}
         `;
 
-        const result = await this.clientStatisticsRepository.query(query, [address, clientName]);
-
+        const result = await this.clientStatisticsRepository.query(query, [
+            address,
+            clientName,
+        ]);
 
         const difficultySum = result[0].difficultySum;
 
-        return (difficultySum * 4294967296) / (600);
-
+        return (difficultySum * 4294967296) / 600;
     }
 
     public async getChartDataForGroup(address: string, clientName: string) {
-        var yesterday = new Date(new Date().getTime() - (24 * 60 * 60 * 1000));
+        var yesterday = new Date(new Date().getTime() - 24 * 60 * 60 * 1000);
 
         const query = `
             SELECT
@@ -171,19 +144,24 @@ export class ClientStatisticsService {
             LIMIT 144;
         `;
 
-        const result = await this.clientStatisticsRepository.query(query, [address, clientName]);
+        const result = await this.clientStatisticsRepository.query(query, [
+            address,
+            clientName,
+        ]);
 
-        return result.map(res => {
-            res.label = new Date(res.label).toISOString();
-            return res;
-        }).slice(0, result.length - 1);
-
-
+        return result
+            .map((res) => {
+                res.label = new Date(res.label).toISOString();
+                return res;
+            })
+            .slice(0, result.length - 1);
     }
 
-
-    public async getHashRateForSession(address: string, clientName: string, sessionId: string) {
-
+    public async getHashRateForSession(
+        address: string,
+        clientName: string,
+        sessionId: string,
+    ) {
         const query = `
             SELECT
                 createdAt,
@@ -197,7 +175,11 @@ export class ClientStatisticsService {
             LIMIT 2;
         `;
 
-        const result = await this.clientStatisticsRepository.query(query, [address, clientName, sessionId]);
+        const result = await this.clientStatisticsRepository.query(query, [
+            address,
+            clientName,
+            sessionId,
+        ]);
 
         if (result.length < 1) {
             return 0;
@@ -206,7 +188,9 @@ export class ClientStatisticsService {
         const latestStat = result[0];
 
         if (result.length < 2) {
-            const time = new Date(latestStat.updatedAt).getTime() - new Date(latestStat.createdAt).getTime();
+            const time =
+                new Date(latestStat.updatedAt).getTime() -
+                new Date(latestStat.createdAt).getTime();
             // 1min
             if (time < 1000 * 60) {
                 return 0;
@@ -214,18 +198,26 @@ export class ClientStatisticsService {
             return (latestStat.shares * 4294967296) / (time / 1000);
         } else {
             const secondLatestStat = result[1];
-            const time = new Date(latestStat.updatedAt).getTime() - new Date(secondLatestStat.createdAt).getTime();
+            const time =
+                new Date(latestStat.updatedAt).getTime() -
+                new Date(secondLatestStat.createdAt).getTime();
             // 1min
             if (time < 1000 * 60) {
                 return 0;
             }
-            return ((latestStat.shares + secondLatestStat.shares) * 4294967296) / (time / 1000);
+            return (
+                ((latestStat.shares + secondLatestStat.shares) * 4294967296) /
+                (time / 1000)
+            );
         }
-
     }
 
-    public async getChartDataForSession(address: string, clientName: string, sessionId: string) {
-        var yesterday = new Date(new Date().getTime() - (24 * 60 * 60 * 1000));
+    public async getChartDataForSession(
+        address: string,
+        clientName: string,
+        sessionId: string,
+    ) {
+        var yesterday = new Date(new Date().getTime() - 24 * 60 * 60 * 1000);
 
         const query = `
             SELECT
@@ -242,16 +234,21 @@ export class ClientStatisticsService {
             LIMIT 144;
         `;
 
-        const result = await this.clientStatisticsRepository.query(query, [address, clientName, sessionId]);
+        const result = await this.clientStatisticsRepository.query(query, [
+            address,
+            clientName,
+            sessionId,
+        ]);
 
-        return result.map(res => {
-            res.label = new Date(res.label).toISOString();
-            return res;
-        }).slice(0, result.length - 1);
-
+        return result
+            .map((res) => {
+                res.label = new Date(res.label).toISOString();
+                return res;
+            })
+            .slice(0, result.length - 1);
     }
 
     public async deleteAll() {
-        return await this.clientStatisticsRepository.delete({})
+        return await this.clientStatisticsRepository.delete({});
     }
 }
