@@ -5,12 +5,6 @@ import { Socket } from 'net';
 import { firstValueFrom, Subscription } from 'rxjs';
 import { clearInterval } from 'timers';
 
-import * as compto from '@compto/comptoken-js-offchain';
-import {
-    getAssociatedTokenAddressSync,
-    TOKEN_2022_PROGRAM_ID,
-} from '@solana/spl-token';
-import { sendAndConfirmTransaction, Transaction } from '@solana/web3.js';
 import { ClientStatisticsService } from '../ORM/client-statistics/client-statistics.service';
 import { ClientEntity } from '../ORM/client/client.entity';
 import { ClientService } from '../ORM/client/client.service';
@@ -438,62 +432,48 @@ export class StratumV1Client {
         let extraDataHashed = this.doubleSHA256(xhashbuf);
         const versionBuffer = Buffer.alloc(4);
         versionBuffer.writeUInt32LE(jobTemplate.block.version);
-        let comptokenProof: compto.ComptokenProof;
-        try {
-            comptokenProof = new compto.ComptokenProof(
-                Buffer.from(jobTemplate.block.transactions[0], 'hex'),
-                this.hexStringToLittleEndianBuffer(
-                    jobTemplate.block.currentblockhash,
-                ),
-                extraDataHashed,
-                this.hexStringToLittleEndianBuffer(submission.nonce),
-                versionBuffer,
-                this.hexStringToLittleEndianBuffer(submission.ntime),
-            );
-        } catch (e) {
-            if (
-                e instanceof Error &&
-                e.message === 'The provided proof does not have enough zeroes'
-            ) {
-                const err = new StratumErrorMessage(
-                    submission.id,
-                    eStratumErrorCode.LowDifficultyShare,
-                    'Difficulty too low',
-                ).response();
-                const success = await this.write(err);
-                if (!success) {
+
+        let mintComptokensResult = await this.comptoRpcService.mineComptokens(
+            extraDataHashed,
+            parseInt(submission.nonce, 16),
+            jobTemplate.block.version,
+            parseInt(submission.ntime, 16),
+        );
+
+        if (mintComptokensResult.error != null) {
+            switch (mintComptokensResult.error) {
+                case 'Difficultu too low': {
+                    const err = new StratumErrorMessage(
+                        submission.id,
+                        eStratumErrorCode.LowDifficultyShare,
+                        'Difficulty too low',
+                    ).response();
+                    const success = await this.write(err);
+                    if (!success) {
+                        return false;
+                    }
                     return false;
                 }
-                return false;
+                default: {
+                    const err = new StratumErrorMessage(
+                        submission.id,
+                        eStratumErrorCode.OtherUnknown,
+                        'Error mining comptokens',
+                    ).response();
+                    const success = await this.write(err);
+                    if (!success) {
+                        return false;
+                    }
+                    return false;
+                }
             }
         }
 
-        let testuser_compto_pubkey = getAssociatedTokenAddressSync(
-            compto.comptoken_mint_pubkey,
-            compto.test_account.publicKey,
-            false,
-            TOKEN_2022_PROGRAM_ID,
-        );
-        let mintComptokensTransaction = new Transaction();
-        mintComptokensTransaction.add(
-            await compto.createProofSubmissionInstruction(
-                comptokenProof,
-                compto.test_account.publicKey,
-                testuser_compto_pubkey,
-            ),
-        );
-
-        let mintComptokensResult = await sendAndConfirmTransaction(
-            this.comptoRpcService.connection,
-            mintComptokensTransaction,
-            [compto.test_account, compto.test_account],
-        );
         console.log(
             '==================================================================================',
         );
         console.log(
-            'mintComptokens transaction confirmed',
-            mintComptokensResult,
+            `mintComptokens transaction confirmed: ${mintComptokensResult.result}`,
         );
         console.log(
             '==================================================================================',

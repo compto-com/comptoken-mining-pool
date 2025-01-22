@@ -582,6 +582,7 @@ static inline int scanhash_sha256d_8way(int thr_id, struct work *work,
                 if (fulltest(hash, ptarget))
                 {
                     printf("fulltest\n");
+                    printf("header: %s\n", abin2hex((uint8_t *)pdata, 80));
                     printf("HASH FOUND >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>.\n");
                     printf("hash: %s\n", abin2hex((uint8_t *)hash, 32));
                     printf("HASH FOUND >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>.\n");
