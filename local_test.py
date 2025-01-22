@@ -8,7 +8,7 @@ import io
 import typing
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
-CPU_MINER_CMD = f"unbuffer {SCRIPT_DIR}/cpuminer-multi/cpuminer -O 1FhDPLPpw18X4srecguG3MxJYe4a1JsZnd:bitcoin -a sha256d -o stratum+tcp://127.0.0.1:3333 -t 2"
+CPU_MINER_CMD = f"unbuffer {SCRIPT_DIR}/cpuminer-multi/cpuminer -O 1FhDPLPpw18X4srecguG3MxJYe4a1JsZnd:bitcoin --algo sha256d --retry-pause 2 -o stratum+tcp://127.0.0.1:3333 -t 2"
 STRATUM_POOL_CMD = "npm run start:dev"
 
 # List to store active subprocesses

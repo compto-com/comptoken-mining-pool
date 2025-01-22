@@ -57,67 +57,7 @@ cpuminer_SOURCES = \
   lyra2/Lyra2.c lyra2/Sponge.c \
   yescrypt/yescrypt-common.c yescrypt/yescrypt-best.c \
   yescrypt/sha256_Y.c \
-  algo/allium.c \
-  algo/axiom.c \
-  algo/bastion.c \
-  algo/blake.c \
-  algo/blakecoin.c \
-  algo/blake2.c \
-  algo/bmw256.c \
-  algo/c11.c \
-  algo/cryptonight.c \
-  algo/cryptolight.c \
-  algo/decred.c \
-  algo/drop.c \
-  algo/fresh.c \
-  algo/geek.c \
-  algo/groestl.c \
-  algo/heavy.c \
-  algo/ink.c \
-  algo/jha.c \
-  algo/lbry.c \
-  algo/luffa.c \
-  algo/lyra2re.c \
-  algo/lyra2rev2.c \
-  algo/lyra2v3.c \
-  algo/myr-groestl.c \
-  algo/keccak.c \
-  algo/pentablake.c \
-  algo/phi1612.c \
-  algo/phi2.c \
-  algo/quark.c \
-  algo/neoscrypt.c \
-  algo/nist5.c \
-  algo/pluck.c \
-  algo/qubit.c \
-  algo/rainforest.c \
-  algo/scrypt.c \
-  algo/scrypt-jane.c \
-  algo/sha2.c \
-  algo/sia.c \
-  algo/sibcoin.c \
-  algo/skein.c \
-  algo/skein2.c \
-  algo/sonoa.c \
-  algo/s3.c \
-  algo/bitcore.c \
-  algo/timetravel.c \
-  algo/tribus.c \
-  algo/veltor.c \
-  algo/x11evo.c \
-  algo/x11.c \
-  algo/x12.c \
-  algo/x13.c \
-  algo/x14.c \
-  algo/x15.c \
-  algo/x16r.c \
-  algo/x16rv2.c \
-  algo/x16s.c \
-  algo/x20r.c \
-  algo/x17.c \
-  algo/xevan.c \
-  algo/yescrypt.c \
-  algo/zr5.c
+  algo/sha2.c
 
 disable_flags =
 
