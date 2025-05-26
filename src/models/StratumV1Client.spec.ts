@@ -7,24 +7,20 @@ import { DataSource } from 'typeorm';
 
 import { MockRecording1 } from '../../test/models/MockRecording1';
 import { AddressSettingsModule } from '../ORM/address-settings/address-settings.module';
-import { AddressSettingsService } from '../ORM/address-settings/address-settings.service';
-import { BlocksService } from '../ORM/blocks/blocks.service';
 import { ClientStatisticsEntity } from '../ORM/client-statistics/client-statistics.entity';
 import { ClientStatisticsModule } from '../ORM/client-statistics/client-statistics.module';
 import { ClientStatisticsService } from '../ORM/client-statistics/client-statistics.service';
 import { ClientEntity } from '../ORM/client/client.entity';
 import { ClientModule } from '../ORM/client/client.module';
 import { ClientService } from '../ORM/client/client.service';
-import { BitcoinRpcService as MockBitcoinRpcService } from '../services/bitcoin-rpc.service';
-import { NotificationService } from '../services/notification.service';
+import { ComptoRpcService as MockComptoRpcService } from '../services/compto-rpc.service';
 import { StratumV1JobsService } from '../services/stratum-v1-jobs.service';
-import { IMiningInfo } from './bitcoin-rpc/IMiningInfo';
 import { StratumV1Client } from './StratumV1Client';
 
-jest.mock('../services/bitcoin-rpc.service');
+jest.mock('../services/compto-rpc.service');
 
 jest.mock('./validators/bitcoin-address.validator', () => ({
-    IsBitcoinAddress() {
+    IsComptokenAddress() {
         return jest.fn();
     },
 }));
@@ -32,21 +28,16 @@ jest.mock('./validators/bitcoin-address.validator', () => ({
 describe('StratumV1Client', () => {
     let socket: Socket;
     let stratumV1JobsService: StratumV1JobsService;
-    let bitcoinRpcService: MockBitcoinRpcService;
+    let comptoRpcService: MockComptoRpcService;
 
     let clientService: ClientService;
     let clientStatisticsService: ClientStatisticsService;
-    let notificationService: NotificationService;
-    let blocksService: BlocksService;
-    let configService: ConfigService;
 
     let client: StratumV1Client;
 
     let socketEmitter: (...args: any[]) => void;
 
-    let newBlockEmitter: BehaviorSubject<IMiningInfo> = new BehaviorSubject(
-        null,
-    );
+    const newBlockEmitter: BehaviorSubject<Buffer> = new BehaviorSubject(null);
 
     let moduleRef: TestingModule;
 
@@ -98,20 +89,15 @@ describe('StratumV1Client', () => {
             ClientStatisticsService,
         );
 
-        configService = moduleRef.get<ConfigService>(ConfigService);
-
-        bitcoinRpcService = new MockBitcoinRpcService(null);
-        jest.spyOn(bitcoinRpcService, 'getBlockTemplate').mockReturnValue(
-            Promise.resolve(MockRecording1.BLOCK_TEMPLATE),
+        comptoRpcService = new MockComptoRpcService(null);
+        jest.spyOn(comptoRpcService, 'getBlockTemplate').mockReturnValue(
+            MockRecording1.BLOCK_TEMPLATE,
         );
-        bitcoinRpcService.newBlock$ = newBlockEmitter.asObservable();
+        comptoRpcService.newBlock$ = newBlockEmitter.asObservable();
 
-        stratumV1JobsService = new StratumV1JobsService(bitcoinRpcService);
+        stratumV1JobsService = new StratumV1JobsService(comptoRpcService);
 
         socket = new Socket();
-        // jest.spyOn(socket, 'on').mockImplementation((event: string, fn: (data: Buffer) => void) => {
-        //     socketEmitter = fn;
-        // });
 
         jest.spyOn(socket, 'on').mockImplementation(
             (event: string, listener: (...args: any[]) => void) => {
@@ -122,20 +108,12 @@ describe('StratumV1Client', () => {
 
         socket.end = jest.fn();
 
-        const addressSettings = moduleRef.get<AddressSettingsService>(
-            AddressSettingsService,
-        );
-
         client = new StratumV1Client(
             socket,
             stratumV1JobsService,
-            bitcoinRpcService,
             clientService,
             clientStatisticsService,
-            notificationService,
-            blocksService,
-            configService,
-            addressSettings,
+            comptoRpcService,
         );
 
         client.extraNonceAndSessionId = MockRecording1.EXTRA_NONCE;
@@ -144,7 +122,9 @@ describe('StratumV1Client', () => {
     });
 
     afterEach(async () => {
-        client.destroy();
+        if (client) {
+            client.destroy();
+        }
         jest.useRealTimers();
     });
 
@@ -159,7 +139,7 @@ describe('StratumV1Client', () => {
     });
 
     it('should respond to mining.subscribe', async () => {
-        jest.spyOn(socket, 'write').mockImplementation((data) => true);
+        jest.spyOn(socket, 'write').mockImplementation((_data) => true);
 
         expect(socket.on).toHaveBeenCalled();
         socketEmitter(Buffer.from(MockRecording1.MINING_SUBSCRIBE));
@@ -173,7 +153,7 @@ describe('StratumV1Client', () => {
     });
 
     it('should respond to mining.configure', async () => {
-        jest.spyOn(socket, 'write').mockImplementation((data) => true);
+        jest.spyOn(socket, 'write').mockImplementation((_data) => true);
 
         expect(socket.on).toHaveBeenCalled();
         socketEmitter(Buffer.from(MockRecording1.MINING_CONFIGURE));
@@ -185,7 +165,7 @@ describe('StratumV1Client', () => {
     });
 
     it('should respond to mining.authorize', async () => {
-        jest.spyOn(socket, 'write').mockImplementation((data) => true);
+        jest.spyOn(socket, 'write').mockImplementation((_data) => true);
 
         expect(socket.on).toHaveBeenCalled();
         socketEmitter(Buffer.from(MockRecording1.MINING_AUTHORIZE));
@@ -197,7 +177,7 @@ describe('StratumV1Client', () => {
     });
 
     it('should respond to mining.suggest_difficulty', async () => {
-        jest.spyOn(socket, 'write').mockImplementation((data) => true);
+        jest.spyOn(socket, 'write').mockImplementation((_data) => true);
 
         expect(socket.on).toHaveBeenCalled();
         socketEmitter(Buffer.from(MockRecording1.MINING_SUGGEST_DIFFICULTY));
@@ -209,7 +189,7 @@ describe('StratumV1Client', () => {
     });
 
     it('should set difficulty', async () => {
-        jest.spyOn(client as any, 'write').mockImplementation((data) =>
+        jest.spyOn(client as any, 'write').mockImplementation((_data) =>
             Promise.resolve(true),
         );
 
@@ -224,7 +204,7 @@ describe('StratumV1Client', () => {
     });
 
     it('should save client', async () => {
-        jest.spyOn(client as any, 'write').mockImplementation((data) =>
+        jest.spyOn(client as any, 'write').mockImplementation((_data) =>
             Promise.resolve(true),
         );
 
@@ -241,7 +221,7 @@ describe('StratumV1Client', () => {
 
         jest.setSystemTime(date);
 
-        jest.spyOn(client as any, 'write').mockImplementation((data) =>
+        jest.spyOn(client as any, 'write').mockImplementation((_data) =>
             Promise.resolve(true),
         );
 
@@ -251,7 +231,7 @@ describe('StratumV1Client', () => {
 
         await new Promise((r) => setTimeout(r, 100));
 
-        expect((client as any).write).lastCalledWith(
+        expect((client as any).write).toHaveBeenLastCalledWith(
             `{"id":null,"method":"mining.notify","params":["1","171592f223740e92d223f6e68bff25279af7ac4f2246451e0000000200000000","02000000010000000000000000000000000000000000000000000000000000000000000000ffffffff1903c943255c7075626c69632d706f6f6c5c","ffffffff037a90000000000000160014e6f22ca44dc800e9d049621a3b9a42c509f1c4bc3b0f250000000000160014e6f22ca44dc800e9d049621a3b9a42c509f1c4bc0000000000000000266a24aa21a9edbd3d1d916aa0b57326a2d88ebe1b68a1d7c48585f26d8335fe6a94b62755f64c00000000",["175335649d5e8746982969ec88f52e85ac9917106fba5468e699c8879ab974a1","d5644ab3e708c54cd68dc5aedc92b8d3037449687f92ec41ed6e37673d969d4a","5c9ec187517edc0698556cca5ce27e54c96acb014770599ed9df4d4937fbf2b0"],"20000000","192495f8","${MockRecording1.TIME}",false]}\n`,
         );
 
@@ -260,7 +240,7 @@ describe('StratumV1Client', () => {
         jest.useRealTimers();
         await new Promise((r) => setTimeout(r, 1000));
 
-        expect((client as any).write).lastCalledWith(
+        expect((client as any).write).toHaveBeenLastCalledWith(
             `{\"id\":5,\"error\":null,\"result\":true}\n`,
         );
     });
