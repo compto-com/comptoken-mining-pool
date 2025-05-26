@@ -164,26 +164,33 @@ export class ComptoRpcService implements OnModuleInit {
                     'The provided proof does not have enough zeroes',
                 )
             ) {
-                return { error: 'Difficultu too low' };
+                return { error: 'Difficulty too low' };
             }
+            // Return unexpected error message
+            return { error: e instanceof Error ? e.message : 'Unknown error' };
         }
 
-        let mintComptokensTransaction = new Transaction();
-        mintComptokensTransaction.add(
-            await createProofSubmissionInstruction(
-                proof,
-                this.user_keypair.publicKey,
-                testuser_compto_pubkey,
-                this.compto_public_keys,
-            ),
-        );
+        try {
+            const mintComptokensTransaction = new Transaction();
+            mintComptokensTransaction.add(
+                await createProofSubmissionInstruction(
+                    proof,
+                    this.user_keypair.publicKey,
+                    testuser_compto_pubkey,
+                    this.compto_public_keys,
+                ),
+            );
 
-        let mintComptokensResult = await sendAndConfirmTransaction(
-            this.connection,
-            mintComptokensTransaction,
-            [this.user_keypair],
-        );
-        return { result: mintComptokensResult };
+            const mintComptokensResult = await sendAndConfirmTransaction(
+                this.connection,
+                mintComptokensTransaction,
+                [this.user_keypair],
+            );
+            return { result: mintComptokensResult };
+        } catch (e) {
+            // Catch and return any errors during transaction
+            return { error: e instanceof Error ? e.message : 'Unknown error' };
+        }
     }
 
     public async pollMiningInfo() {
@@ -200,7 +207,7 @@ export class ComptoRpcService implements OnModuleInit {
 
     public getBlockTemplate(blockHash: Buffer): IComptoBlockTemplate {
         console.log('getBlockTemplate');
-        let testuser_comptoken_account = getAssociatedTokenAddressSync(
+        const testuser_comptoken_account = getAssociatedTokenAddressSync(
             this.compto_public_keys.comptoken_mint_pubkey,
             this.user_keypair.publicKey,
             false,

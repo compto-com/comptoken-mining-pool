@@ -437,7 +437,7 @@ export class StratumV1Client {
 
         if (mintComptokensResult.error != null) {
             switch (mintComptokensResult.error) {
-                case 'Difficultu too low': {
+                case 'Difficulty too low': {
                     const err = new StratumErrorMessage(
                         submission.id,
                         eStratumErrorCode.LowDifficultyShare,
