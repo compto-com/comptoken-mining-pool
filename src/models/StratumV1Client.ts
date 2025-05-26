@@ -453,7 +453,7 @@ export class StratumV1Client {
             '==================================================================================',
         );
 
-        await this.checkDifficulty();
+        //await this.checkDifficulty();
         return true;
     }
 

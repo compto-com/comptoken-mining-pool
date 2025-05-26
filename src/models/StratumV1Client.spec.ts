@@ -76,7 +76,11 @@ describe('StratumV1Client', () => {
     });
 
     beforeEach(async () => {
+        console.log('========================================================');
+        console.log('========================================================');
+        console.log('========================================================');
         console.log('NEW TEST');
+        console.log(expect.getState().currentTestName);
 
         clientService = moduleRef.get<ClientService>(ClientService);
 
@@ -182,8 +186,11 @@ describe('StratumV1Client', () => {
         expect(socket.on).toHaveBeenCalled();
         socketEmitter(Buffer.from(MockRecording1.MINING_SUGGEST_DIFFICULTY));
         await new Promise((r) => setTimeout(r, 1));
+        // 20: OtherUnknown error code
+        // "Suggested difficulty not supported" error message
+        // "" validation errors
         expect(socket.write).toHaveBeenCalledWith(
-            `{"id":null,"method":"mining.set_difficulty","params":[512]}\n`,
+            `{"id":4,"result":null,"error":[20,"Suggested difficulty not supported",""]}\n`,
             expect.any(Function),
         );
     });
@@ -225,6 +232,10 @@ describe('StratumV1Client', () => {
             Promise.resolve(true),
         );
 
+        (comptoRpcService.mineComptokens as jest.Mock).mockImplementation(() =>
+            Promise.resolve({ result: 'mocked result' }),
+        );
+
         socketEmitter(Buffer.from(MockRecording1.MINING_SUBSCRIBE));
         socketEmitter(Buffer.from(MockRecording1.MINING_SUGGEST_DIFFICULTY));
         socketEmitter(Buffer.from(MockRecording1.MINING_AUTHORIZE));
@@ -232,7 +243,23 @@ describe('StratumV1Client', () => {
         await new Promise((r) => setTimeout(r, 100));
 
         expect((client as any).write).toHaveBeenLastCalledWith(
-            `{"id":null,"method":"mining.notify","params":["1","171592f223740e92d223f6e68bff25279af7ac4f2246451e0000000200000000","02000000010000000000000000000000000000000000000000000000000000000000000000ffffffff1903c943255c7075626c69632d706f6f6c5c","ffffffff037a90000000000000160014e6f22ca44dc800e9d049621a3b9a42c509f1c4bc3b0f250000000000160014e6f22ca44dc800e9d049621a3b9a42c509f1c4bc0000000000000000266a24aa21a9edbd3d1d916aa0b57326a2d88ebe1b68a1d7c48585f26d8335fe6a94b62755f64c00000000",["175335649d5e8746982969ec88f52e85ac9917106fba5468e699c8879ab974a1","d5644ab3e708c54cd68dc5aedc92b8d3037449687f92ec41ed6e37673d969d4a","5c9ec187517edc0698556cca5ce27e54c96acb014770599ed9df4d4937fbf2b0"],"20000000","192495f8","${MockRecording1.TIME}",false]}\n`,
+            [
+                `{`,
+                /**/ `"id":null,`,
+                /**/ `"method":"mining.notify",`,
+                /**/ `"params":[`,
+                /*    */ `"1",`,
+                /*    */ `"171592f223740e92d223f6e68bff25279af7ac4f2246451e0000000200000000",`,
+                /*    */ `"",`,
+                /*    */ `"",`,
+                /*    */ `[],`,
+                /*    */ `"20000000",`,
+                /*    */ `"192495f8",`,
+                /*    */ `"${MockRecording1.TIME}",`,
+                /*    */ `false`,
+                /**/ `]`,
+                `}\n`,
+            ].join(''),
         );
 
         socketEmitter(Buffer.from(MockRecording1.MINING_SUBMIT));
