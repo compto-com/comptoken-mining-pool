@@ -20,6 +20,7 @@ import { MiningJob } from './MiningJob';
 import { AuthorizationMessage } from './stratum-messages/AuthorizationMessage';
 import { ConfigurationMessage } from './stratum-messages/ConfigurationMessage';
 import { MiningSubmitMessage } from './stratum-messages/MiningSubmitMessage';
+import { StratumBaseMessage } from './stratum-messages/StratumBaseMessage';
 import { StratumErrorMessage } from './stratum-messages/StratumErrorMessage';
 import { SubscriptionMessage } from './stratum-messages/SubscriptionMessage';
 import { SuggestDifficulty } from './stratum-messages/SuggestDifficultyMessage';
@@ -56,8 +57,8 @@ export class StratumV1Client {
     ) {
         console.log('StratumV1Client created');
         this.socket.on('data', (data: Buffer) => {
-            this.buffer += data.toString();
-            let lines = this.buffer.split('\n');
+            const accumulatedData = this.buffer + data.toString();
+            const lines = accumulatedData.split('\n');
             this.buffer = lines.pop() || ''; // Save the last part of the data (incomplete line) to the buffer
 
             lines
@@ -99,7 +100,7 @@ export class StratumV1Client {
         console.log('----->');
 
         // Parse the message and check if it's the initial subscription message
-        let parsedMessage = null;
+        let parsedMessage: StratumBaseMessage = null;
         try {
             parsedMessage = JSON.parse(message);
         } catch (e) {
@@ -419,21 +420,15 @@ export class StratumV1Client {
             job.jobTemplateId,
         );
 
-        const versionMask = parseInt(submission.versionMask, 16);
-        let version = 0x20000000;
-        if (versionMask !== undefined && versionMask != 0) {
-            version = version ^ versionMask;
-        }
-
         const xhashbuf = Buffer.from(
             this.extraNonceAndSessionId + submission.extraNonce2,
             'hex',
         );
-        let extraDataHashed = this.doubleSHA256(xhashbuf);
+        const extraDataHashed = this.doubleSHA256(xhashbuf);
         const versionBuffer = Buffer.alloc(4);
         versionBuffer.writeUInt32LE(jobTemplate.block.version);
 
-        let mintComptokensResult = await this.comptoRpcService.mineComptokens(
+        const mintComptokensResult = await this.comptoRpcService.mineComptokens(
             extraDataHashed,
             parseInt(submission.nonce, 16),
             jobTemplate.block.version,

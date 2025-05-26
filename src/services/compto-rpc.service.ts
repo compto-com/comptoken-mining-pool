@@ -146,7 +146,7 @@ export class ComptoRpcService implements OnModuleInit {
         console.log(`timestamp: ${timestamp}`);
         console.log(`target: ${Buffer.from(target).toString('hex')}`);
 
-        let proof;
+        let proof: ComptokenProof;
         try {
             proof = new ComptokenProof({
                 pubkey: testuser_compto_pubkey,
@@ -221,7 +221,7 @@ export class ComptoRpcService implements OnModuleInit {
 
     public async getMiningInfo(): Promise<Buffer> {
         try {
-            let getvalidblockhash: any = await getValidBlockhashes(
+            const getvalidblockhash = await getValidBlockhashes(
                 this.connection,
                 this.user_keypair,
                 this.compto_public_keys,

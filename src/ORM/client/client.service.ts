@@ -33,7 +33,7 @@ export class ClientService {
     }
 
     public async killDeadClients() {
-        var fiveMinutes = new Date(
+        const fiveMinutes = new Date(
             new Date().getTime() - 5 * 60 * 1000,
         ).toISOString();
 

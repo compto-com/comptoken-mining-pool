@@ -14,7 +14,7 @@ export class SuggestDifficulty extends StratumBaseMessage {
 
     @Expose()
     @IsNumber()
-    @Transform(({ value, key, obj, type }) => {
+    @Transform(({ value: _value, key: _key, obj, type: _type }) => {
         return Number(obj.params[0]);
     })
     public suggestedDifficulty: number;
