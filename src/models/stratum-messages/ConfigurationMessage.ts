@@ -5,7 +5,7 @@ import { StratumBaseMessage } from './StratumBaseMessage';
 
 export class ConfigurationMessage extends StratumBaseMessage {
     @IsArray()
-    params: string[];
+    params!: string[];
 
     constructor() {
         super();

@@ -37,7 +37,9 @@ describe('StratumV1Client', () => {
 
     let socketEmitter: (...args: any[]) => void;
 
-    const newBlockEmitter: BehaviorSubject<Buffer> = new BehaviorSubject(null);
+    const newBlockEmitter: BehaviorSubject<Buffer> = new BehaviorSubject(
+        Buffer.alloc(0),
+    );
 
     let moduleRef: TestingModule;
 
@@ -93,7 +95,9 @@ describe('StratumV1Client', () => {
             ClientStatisticsService,
         );
 
-        comptoRpcService = new MockComptoRpcService(null);
+        comptoRpcService = new MockComptoRpcService(
+            moduleRef.get(ConfigService),
+        );
         jest.spyOn(comptoRpcService, 'getBlockTemplate').mockReturnValue(
             MockRecording1.BLOCK_TEMPLATE,
         );
@@ -180,19 +184,13 @@ describe('StratumV1Client', () => {
         );
     });
 
-    it('should respond to mining.suggest_difficulty', async () => {
+    it('should ignore mining.suggest_difficulty', async () => {
         jest.spyOn(socket, 'write').mockImplementation((_data) => true);
 
         expect(socket.on).toHaveBeenCalled();
         socketEmitter(Buffer.from(MockRecording1.MINING_SUGGEST_DIFFICULTY));
         await new Promise((r) => setTimeout(r, 1));
-        // 20: OtherUnknown error code
-        // "Suggested difficulty not supported" error message
-        // "" validation errors
-        expect(socket.write).toHaveBeenCalledWith(
-            `{"id":4,"result":null,"error":[20,"Suggested difficulty not supported",""]}\n`,
-            expect.any(Function),
-        );
+        expect(socket.write).not.toHaveBeenCalled();
     });
 
     it('should set difficulty', async () => {
@@ -243,23 +241,21 @@ describe('StratumV1Client', () => {
         await new Promise((r) => setTimeout(r, 100));
 
         expect((client as any).write).toHaveBeenLastCalledWith(
-            [
-                `{`,
-                /**/ `"id":null,`,
-                /**/ `"method":"mining.notify",`,
-                /**/ `"params":[`,
-                /*    */ `"1",`,
-                /*    */ `"171592f223740e92d223f6e68bff25279af7ac4f2246451e0000000200000000",`,
-                /*    */ `"",`,
-                /*    */ `"",`,
-                /*    */ `[],`,
-                /*    */ `"20000000",`,
-                /*    */ `"192495f8",`,
-                /*    */ `"${MockRecording1.TIME}",`,
-                /*    */ `false`,
-                /**/ `]`,
-                `}\n`,
-            ].join(''),
+            JSON.stringify({
+                id: null,
+                method: 'mining.notify',
+                params: [
+                    '1',
+                    '171592f223740e92d223f6e68bff25279af7ac4f2246451e0000000200000000',
+                    '', // coinbasePart1
+                    '', // coinbasePart2
+                    [], // transactions
+                    '20000000', // version
+                    '192495f8', // bits
+                    MockRecording1.TIME, // timestamp
+                    false, // clearJobs
+                ],
+            }) + '\n',
         );
 
         socketEmitter(Buffer.from(MockRecording1.MINING_SUBMIT));

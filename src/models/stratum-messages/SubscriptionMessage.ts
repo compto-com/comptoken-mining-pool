@@ -6,17 +6,17 @@ import { StratumBaseMessage } from './StratumBaseMessage';
 
 export class SubscriptionMessage extends StratumBaseMessage {
     @IsArray()
-    params: string[];
+    params!: string[];
 
     @Expose()
     @IsString()
     @MaxLength(128)
-    @Transform(({ value, key, obj, type }) => {
+    @Transform(({ value: _value, key: _key, obj, type: _type }) => {
         return obj?.params?.[0] == null
             ? 'unknown'
             : SubscriptionMessage.refineUserAgent(obj.params[0]);
     })
-    public userAgent: string;
+    public userAgent!: string;
 
     constructor() {
         super();

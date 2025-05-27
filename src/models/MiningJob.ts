@@ -4,14 +4,14 @@ import { IMiningNotify } from './stratum-messages/IMiningNotify';
 
 export class MiningJob {
     public jobTemplateId: string;
-    public networkDifficulty: number;
+    //public networkDifficulty: number;
 
     constructor(public jobId: string, jobTemplate: IJobTemplate) {
         this.jobTemplateId = jobTemplate.blockData.id;
     }
 
     public response(jobTemplate: IJobTemplate): string {
-        let currentBlockhashNaturalOrder = this.swapEndianStrings(
+        const currentBlockhashNaturalOrder = this.swapEndianStrings(
             this.reverseHexString(jobTemplate.block.currentblockhash),
         );
         const job: IMiningNotify = {

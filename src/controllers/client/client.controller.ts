@@ -53,7 +53,7 @@ export class ClientController {
     ) {
         const workers = await this.clientService.getByName(address, workerName);
 
-        const bestDifficulty = workers.reduce((pre, cur, idx, arr) => {
+        const bestDifficulty = workers.reduce((pre, cur, _idx, _arr) => {
             if (cur.bestDifficulty > pre) {
                 return cur.bestDifficulty;
             }

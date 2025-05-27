@@ -8,7 +8,7 @@ export abstract class TrackedEntity {
         type: 'datetime',
         transformer: new DateTimeTransformer(),
     })
-    public deletedAt?: Date;
+    public deletedAt?: Date | null;
 
     @CreateDateColumn({
         type: 'datetime',

@@ -27,23 +27,23 @@ import { SuggestDifficulty } from './stratum-messages/SuggestDifficultyMessage';
 import { StratumV1ClientStatistics } from './StratumV1ClientStatistics';
 
 export class StratumV1Client {
-    private clientSubscription: SubscriptionMessage;
-    private clientConfiguration: ConfigurationMessage;
-    private clientAuthorization: AuthorizationMessage;
-    private clientSuggestedDifficulty: SuggestDifficulty;
-    private stratumSubscription: Subscription;
+    private clientSubscription: SubscriptionMessage | null = null;
+    private clientConfiguration: ConfigurationMessage | null = null;
+    private clientAuthorization: AuthorizationMessage | null = null;
+    private clientSuggestedDifficulty: SuggestDifficulty | null = null;
+    private stratumSubscription: Subscription | null = null;
     private backgroundWork: NodeJS.Timeout[] = [];
 
-    private statistics: StratumV1ClientStatistics;
+    private statistics: StratumV1ClientStatistics | null = null;
     private stratumInitialized = false;
     private sessionDifficulty: number = 16384;
 
-    private entity: ClientEntity;
-    private creatingEntity: Promise<void>;
+    private entity: ClientEntity | null = null;
+    private creatingEntity: Promise<void> | null = null;
 
-    public extraNonceAndSessionId: string;
-    public sessionStart: Date;
-    public noFee: boolean;
+    public extraNonceAndSessionId: string | null = null;
+    public sessionStart: Date | null = null;
+    public noFee: boolean = false;
     public hashRate: number = 0;
 
     private buffer: string = '';
@@ -127,7 +127,7 @@ export class StratumV1Client {
         console.log('----->');
 
         // Parse the message and check if it's the initial subscription message
-        let parsedMessage: StratumBaseMessage = null;
+        let parsedMessage: StratumBaseMessage;
         try {
             parsedMessage = JSON.parse(message);
         } catch (e) {
@@ -164,12 +164,7 @@ export class StratumV1Client {
                 break;
             }
             case eRequestMethod.SUGGEST_DIFFICULTY: {
-                const success = await this.handleSuggestedDifficultyMessage(
-                    plainToInstance(SuggestDifficulty, parsedMessage),
-                );
-                if (!success) {
-                    return;
-                }
+                // ignore: difficulty is constant for comptokens
                 break;
             }
             case eRequestMethod.SUBMIT: {
@@ -207,7 +202,8 @@ export class StratumV1Client {
             console.error('Invalid subscription message');
             return validationResult.error;
         }
-        const subscriptionMessage = validationResult.result;
+        const subscriptionMessage =
+            validationResult.result as SubscriptionMessage;
 
         if (this.sessionStart == null) {
             this.sessionStart = new Date();
@@ -223,7 +219,9 @@ export class StratumV1Client {
         this.clientSubscription = subscriptionMessage;
         return this.write(
             JSON.stringify(
-                this.clientSubscription.response(this.extraNonceAndSessionId),
+                this.clientSubscription.response(
+                    this.extraNonceAndSessionId as string,
+                ),
             ) + '\n',
         );
     }
@@ -237,7 +235,8 @@ export class StratumV1Client {
             console.error('Invalid configuration message');
             return validationResult.error;
         }
-        const configurationMessage = validationResult.result;
+        const configurationMessage =
+            validationResult.result as ConfigurationMessage;
 
         this.clientConfiguration = configurationMessage;
         return this.write(
@@ -256,24 +255,13 @@ export class StratumV1Client {
             console.error('Invalid authorization message');
             return validationResult.error;
         }
-        const authorizationMessage = validationResult.result;
+        const authorizationMessage =
+            validationResult.result as AuthorizationMessage;
 
         this.clientAuthorization = authorizationMessage;
         return this.write(
             JSON.stringify(this.clientAuthorization.response()) + '\n',
         );
-    }
-
-    private async handleSuggestedDifficultyMessage(
-        parsedMessage: SuggestDifficulty,
-    ) {
-        const err = new StratumErrorMessage(
-            parsedMessage.id,
-            eStratumErrorCode.OtherUnknown,
-            'Suggested difficulty not supported',
-        ).response();
-        console.error(err);
-        return this.write(err);
     }
 
     private async handleSubmitMessage(parsedMessage: StratumBaseMessage) {
@@ -285,7 +273,8 @@ export class StratumV1Client {
             console.error('Invalid mining submit message');
             return validationResult.error;
         }
-        const miningSubmitMessage = validationResult.result;
+        const miningSubmitMessage =
+            validationResult.result as MiningSubmitMessage;
 
         const result = await this.handleMiningSubmission(miningSubmitMessage);
         if (result === false) {
@@ -299,6 +288,7 @@ export class StratumV1Client {
     private async initStratum() {
         console.log('Initializing stratum');
         console.log('oooooooooooooooooooooooooo');
+        assert(this.clientSubscription != null, 'Client subscription is null');
 
         this.stratumInitialized = true;
 
@@ -361,8 +351,11 @@ export class StratumV1Client {
             if (this.creatingEntity == null) {
                 this.creatingEntity = new Promise(async (resolve, reject) => {
                     try {
+                        assert(this.extraNonceAndSessionId != null);
+                        assert(this.clientAuthorization != null);
+                        assert(this.clientSubscription != null);
                         this.entity = await this.clientService.insert({
-                            sessionId: this.extraNonceAndSessionId,
+                            sessionId: this.extraNonceAndSessionId ?? undefined,
                             address: this.clientAuthorization.address,
                             clientName: this.clientAuthorization.worker,
                             userAgent: this.clientSubscription.userAgent,
@@ -398,6 +391,7 @@ export class StratumV1Client {
         const jobTemplate = this.stratumV1JobsService.getJobTemplateById(
             job.jobTemplateId,
         );
+        assert(jobTemplate != null, 'Job template not found');
 
         const xhashbuf = Buffer.from(
             this.extraNonceAndSessionId + submission.extraNonce2,
@@ -467,6 +461,10 @@ export class StratumV1Client {
     }
 
     private async checkDifficulty() {
+        assert(
+            this.statistics != null,
+            'Statistics service is not initialized',
+        );
         const targetDiff = this.statistics.getSuggestedDifficulty(
             this.sessionDifficulty,
         );
@@ -494,43 +492,6 @@ export class StratumV1Client {
             jobTemplate.blockData.clearJobs = true;
             await this.sendNewMiningJob(jobTemplate);
         }
-    }
-
-    private hexStringToLittleEndianBuffer(hexString: string): Buffer {
-        // Remove any leading "0x" if present
-        if (hexString.startsWith('0x') || hexString.startsWith('0X')) {
-            hexString = hexString.slice(2);
-        }
-
-        // Ensure hex string length is even (full bytes)
-        if (hexString.length % 2 !== 0) {
-            hexString = '0' + hexString; // Pad with leading zero
-        }
-
-        // Split hex string into an array of bytes (two hex characters each)
-        const bytes = hexString.match(/.{2}/g);
-        if (!bytes) {
-            return Buffer.alloc(0); // Return empty buffer if no bytes
-        }
-
-        const wordSize = 4; // Word size in bytes (e.g., 4 bytes for 32-bit word)
-        const bufferArray: number[] = [];
-
-        for (let i = 0; i < bytes.length; i += wordSize) {
-            // Get the next word's bytes
-            const wordBytes = bytes.slice(i, i + wordSize);
-
-            // Reverse the bytes within the word for little-endian representation
-            const reversedWordBytes = wordBytes.reverse();
-
-            // Convert the hex strings to numbers and add to buffer array
-            reversedWordBytes.forEach((byteStr) => {
-                bufferArray.push(parseInt(byteStr, 16));
-            });
-        }
-
-        // Create a Buffer from the array of bytes
-        return Buffer.from(bufferArray);
     }
 
     private async write(message: string): Promise<boolean> {
@@ -571,5 +532,12 @@ export class StratumV1Client {
             );
             return false;
         }
+    }
+}
+
+// for some reason importing 'assert' from 'node:assert' isn't working
+function assert(condition: any, message?: string): asserts condition {
+    if (!condition) {
+        throw new Error(message || 'Assertion failed');
     }
 }

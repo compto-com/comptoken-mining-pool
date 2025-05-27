@@ -10,14 +10,14 @@ export class SuggestDifficulty extends StratumBaseMessage {
     @ArrayMinSize(1)
     @ArrayMaxSize(1)
     @IsNumber({}, { each: true })
-    params: string | number[];
+    params!: string | number[];
 
     @Expose()
     @IsNumber()
     @Transform(({ value: _value, key: _key, obj, type: _type }) => {
         return Number(obj.params[0]);
     })
-    public suggestedDifficulty: number;
+    public suggestedDifficulty!: number;
 
     constructor() {
         super();

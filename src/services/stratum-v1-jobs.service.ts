@@ -28,7 +28,7 @@ export interface IJobTemplate {
 
 @Injectable()
 export class StratumV1JobsService {
-    private lastIntervalCount: number;
+    private lastIntervalCount?: number;
     private skipNext: boolean = false;
     public newMiningJob$: Observable<IJobTemplate>;
 
@@ -37,7 +37,7 @@ export class StratumV1JobsService {
 
     public jobs: { [jobId: string]: MiningJob } = {};
 
-    public blocks: { [id: number]: IJobTemplate } = {};
+    public blocks: { [id: string]: IJobTemplate } = {};
 
     // offset the interval so that all the cluster processes don't try and refresh at the same time.
     private delay =
@@ -93,8 +93,8 @@ export class StratumV1JobsService {
                 return comptoJob;
             }),
             filter((next) => next != null),
-
-            tap((data) => {
+            map((data) => data as IJobTemplate), // Ensure type safety
+            tap<IJobTemplate>((data) => {
                 if (data.blockData.clearJobs) {
                     this.blocks = {};
                     this.jobs = {};

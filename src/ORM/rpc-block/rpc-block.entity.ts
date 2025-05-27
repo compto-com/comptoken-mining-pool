@@ -3,11 +3,11 @@ import { Column, Entity, PrimaryColumn } from 'typeorm';
 @Entity()
 export class RpcBlockEntity {
     @PrimaryColumn()
-    blockHeight: number;
+    blockHeight!: number;
 
     @Column({ nullable: true })
-    lockedBy?: string;
+    lockedBy?: string | null;
 
     @Column({ nullable: true })
-    data?: string;
+    data?: string | null;
 }

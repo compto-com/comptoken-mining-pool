@@ -16,29 +16,29 @@ export class AuthorizationMessage extends StratumBaseMessage {
     @IsArray()
     @ArrayMinSize(2)
     @ArrayMaxSize(2)
-    params: string[];
+    params!: string[];
 
     @Expose()
     @IsString()
-    @Transform(({ value, key, obj, type }) => {
+    @Transform(({ value: _value, key: _key, obj, type: _type }) => {
         return obj.params[0].split('.')[0];
     })
     @IsComptokenAddress()
-    public address: string;
+    public address!: string;
 
     @Expose()
     @IsString()
     @MaxLength(64)
-    @Transform(({ value, key, obj, type }) => {
+    @Transform(({ value: _value, key: _key, obj, type: _type }) => {
         return obj.params[0].split('.')[1] == null
             ? 'worker'
             : obj.params[0].split('.')[1];
     })
-    public worker: string;
+    public worker!: string;
 
     @Expose()
     @IsString()
-    @Transform(({ value, key, obj, type }) => {
+    @Transform(({ value: _value, key: _key, obj, type: _type }) => {
         return obj.params[1];
     })
     @MaxLength(64)

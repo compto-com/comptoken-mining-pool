@@ -11,8 +11,8 @@ export class StratumV1ClientStatistics {
     private submissionCacheStart: Date;
     private submissionCache: { time: Date; difficulty: number }[] = [];
 
-    private currentTimeSlot: number = null;
-    private lastSave: number = null;
+    private currentTimeSlot: number | null = null;
+    private lastSave: number | null = null;
 
     constructor(
         private readonly clientStatisticsService: ClientStatisticsService,
@@ -24,9 +24,9 @@ export class StratumV1ClientStatistics {
     // awhile with saveShares()
     public async addShares(client: ClientEntity, targetDifficulty: number) {
         // 10 min
-        var coeff = 1000 * 60 * 10;
-        var date = new Date();
-        var timeSlot = new Date(
+        const coeff = 1000 * 60 * 10;
+        const date = new Date();
+        const timeSlot = new Date(
             Math.floor(date.getTime() / coeff) * coeff,
         ).getTime();
 
@@ -76,7 +76,10 @@ export class StratumV1ClientStatistics {
                 sessionId: client.sessionId,
             });
             this.lastSave = new Date().getTime();
-        } else if (date.getTime() - 60 * 1000 > this.lastSave) {
+        } else if (
+            this.lastSave != null && // always true
+            date.getTime() - 60 * 1000 > this.lastSave
+        ) {
             // If we haven't saved for a minute, update the table
             this.shares += targetDifficulty;
             this.acceptedCount++;
@@ -137,7 +140,7 @@ export class StratumV1ClientStatistics {
         return null;
     }
 
-    private nearestPowerOfTwo(val): number {
+    private nearestPowerOfTwo(val: number): number | null {
         if (val === 0) {
             return null;
         }
@@ -155,7 +158,7 @@ export class StratumV1ClientStatistics {
             return MIN_DIFF;
         }
         if (res == 0) {
-            return this.nearestPowerOfTwo(val * 100) / 100;
+            return (this.nearestPowerOfTwo(val * 100) as number) / 100;
         }
         return res;
     }

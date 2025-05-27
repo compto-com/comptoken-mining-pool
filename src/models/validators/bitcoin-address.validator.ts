@@ -10,8 +10,6 @@ import {
 @ValidatorConstraint({ name: 'ComptokenAddress', async: false })
 @Injectable()
 export class ComptokenAddressValidator implements ValidatorConstraintInterface {
-    constructor() {}
-
     validate(value: string): boolean {
         return true; // originally validated bitcoin addresses, disabled for now b/c it doesn't work yet
         try {
@@ -29,7 +27,7 @@ export class ComptokenAddressValidator implements ValidatorConstraintInterface {
 }
 
 export function IsComptokenAddress(validationOptions?: ValidationOptions) {
-    return function (object: Object, propertyName: string) {
+    return function (object: object, propertyName: string) {
         registerDecorator({
             name: 'isBitcoinAddress',
             target: object.constructor,

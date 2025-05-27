@@ -1,4 +1,5 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
+import assert from 'assert/strict';
 import * as fs from 'fs';
 import { BehaviorSubject, filter, shareReplay } from 'rxjs';
 
@@ -27,14 +28,14 @@ import {
 
 @Injectable()
 export class ComptoRpcService implements OnModuleInit {
-    private compto_public_keys: ComptoPublicKeys;
+    private compto_public_keys!: ComptoPublicKeys; // assigned in onModuleInit
     private user_keypair: Keypair;
-    private solana_cluster: string;
-    private connection: Connection;
+    private solana_cluster!: string; // assigned in onModuleInit
+    private connection!: Connection; // assigned in onModuleInit
 
-    private blockHash: Buffer = null;
-    private _newBlock$: BehaviorSubject<Buffer> = new BehaviorSubject(
-        undefined,
+    private blockHash: Buffer | undefined;
+    private _newBlock$: BehaviorSubject<Buffer> = new BehaviorSubject<Buffer>(
+        Buffer.alloc(0), // Initial value, will be replaced on first poll
     );
     public newBlock$ = this._newBlock$.pipe(
         filter((block) => block != null),
@@ -61,7 +62,12 @@ export class ComptoRpcService implements OnModuleInit {
     }
 
     async onModuleInit() {
-        this.solana_cluster = this.configService.get('SOLANA_CLUSTER');
+        const solana_cluster = this.configService.get('SOLANA_CLUSTER');
+        assert(
+            solana_cluster != null && solana_cluster != undefined,
+            'SOLANA_CLUSTER must be set in the config',
+        );
+        this.solana_cluster = solana_cluster;
         const commitment = this.configService.get('SOLANA_COMMITMENT');
 
         switch (this.solana_cluster) {
@@ -106,7 +112,11 @@ export class ComptoRpcService implements OnModuleInit {
         }
         console.log(
             `compto_public_keys: {\n` +
-                `${Object.keys(this.compto_public_keys)
+                `${(
+                    Object.keys(
+                        this.compto_public_keys,
+                    ) as (keyof ComptoPublicKeys)[]
+                )
                     .map((key) => `    ${key}: ${this.compto_public_keys[key]}`)
                     .join(',\n')}\n` +
                 `}`,
@@ -120,6 +130,10 @@ export class ComptoRpcService implements OnModuleInit {
         version: number,
         timestamp: number,
     ) {
+        assert(
+            this.blockHash != null,
+            'Block hash must be set before mining comptokens',
+        );
         const testuser_compto_pubkey = getAssociatedTokenAddressSync(
             this.compto_public_keys.comptoken_mint_pubkey,
             this.user_keypair.publicKey,
@@ -236,8 +250,11 @@ export class ComptoRpcService implements OnModuleInit {
 
             return Buffer.from(getvalidblockhash.validBlockhash);
         } catch (e) {
-            console.error('Error getmininginfo', e.message);
-            return null;
+            console.error(
+                'Error getmininginfo',
+                e instanceof Error ? e.message : e,
+            );
+            throw e;
         }
     }
 }

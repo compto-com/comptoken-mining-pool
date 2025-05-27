@@ -54,6 +54,4 @@ const ORMModules = [
         BTCPayService,
     ],
 })
-export class AppModule {
-    constructor() {}
-}
+export class AppModule {}

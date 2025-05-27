@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
+import assert from 'assert/strict';
 import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import { ObjectLiteral, Repository } from 'typeorm';
 
@@ -56,14 +57,14 @@ export class ClientService {
     ) {
         return await this.clientRepository.update(
             { address, clientName, sessionId },
-            { hashRate, deletedAt: null, updatedAt },
+            { hashRate, deletedAt: undefined, updatedAt },
         );
     }
 
     public async insert(
         partialClient: Partial<ClientEntity>,
     ): Promise<ClientEntity> {
-        const result = new BehaviorSubject(null);
+        const result = new BehaviorSubject(null as ObjectLiteral | null);
 
         this.insertQueue.push({ result, partialClient });
 
@@ -130,13 +131,15 @@ export class ClientService {
         clientName: string,
         sessionId: string,
     ): Promise<ClientEntity> {
-        return await this.clientRepository.findOne({
+        const existingClient = await this.clientRepository.findOne({
             where: {
                 address,
                 clientName,
                 sessionId,
             },
         });
+        assert(existingClient != null, 'Client not found');
+        return existingClient;
     }
 
     public async deleteAll() {

@@ -9,6 +9,6 @@ export class DateTimeTransformer implements ValueTransformer {
 
     from(value: any): Date {
         // Convert the UTC time from the database to the local time zone
-        return value;
+        return new Date(value);
     }
 }
