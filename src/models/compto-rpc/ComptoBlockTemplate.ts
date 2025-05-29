@@ -2,6 +2,8 @@ export interface IComptoBlockTemplate {
     // (json object)
     version: number; // (numeric) The preferred block version
     currentblockhash: string; // (string) The hash of current highest block
+    coinbasePart1: string; // (string) The first part of the coinbase transaction (before ExtraNonce2)
+    coinbasePart2: string; // (string) The second part of the coinbase transaction (after ExtraNonce2)
     transactions: string[]; // (string) zero bitcoin compatibility placeholder
     bits: string; // (string) compressed target of next block
     timestamp: number; // (numeric) current timestamp in UNIX epoch time

@@ -14,6 +14,8 @@ export class MockRecording1 {
         //vbavailable: {},
         //vbrequired: 0,
         //previousblockhash:
+        coinbasePart1: '',
+        coinbasePart2: '',
         currentblockhash:
             '00000000000000022246451e9af7ac4f8bff2527d223f6e623740e92171592f2',
         transactions: [],

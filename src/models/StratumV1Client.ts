@@ -147,7 +147,7 @@ export class StratumV1Client {
             }
             case eRequestMethod.CONFIGURE: {
                 const success = await this.handleConfigureMessage(
-                    plainToInstance(ConfigurationMessage, parsedMessage),
+                    parsedMessage,
                 );
                 if (!success) {
                     return;
@@ -156,7 +156,7 @@ export class StratumV1Client {
             }
             case eRequestMethod.AUTHORIZE: {
                 const success = await this.handleAuthorizationMessage(
-                    plainToInstance(AuthorizationMessage, parsedMessage),
+                    parsedMessage,
                 );
                 if (!success) {
                     return;
@@ -174,9 +174,7 @@ export class StratumV1Client {
                     return;
                 }
 
-                const success = await this.handleSubmitMessage(
-                    plainToInstance(MiningSubmitMessage, parsedMessage),
-                );
+                const success = await this.handleSubmitMessage(parsedMessage);
                 if (!success) {
                     return;
                 }
@@ -275,6 +273,20 @@ export class StratumV1Client {
         }
         const miningSubmitMessage =
             validationResult.result as MiningSubmitMessage;
+
+        if (
+            this.clientConfiguration?.versionRolling &&
+            !miningSubmitMessage.versionMask
+        ) {
+            // If version rolling is enabled, the version mask is required
+            const err = new StratumErrorMessage(
+                miningSubmitMessage.id,
+                eStratumErrorCode.OtherUnknown,
+                'Version mask is required',
+            ).response();
+            await this.write(err);
+            return false;
+        }
 
         const result = await this.handleMiningSubmission(miningSubmitMessage);
         if (result === false) {
@@ -394,12 +406,35 @@ export class StratumV1Client {
         assert(jobTemplate != null, 'Job template not found');
 
         const xhashbuf = Buffer.from(
-            this.extraNonceAndSessionId + submission.extraNonce2,
+            jobTemplate.block.coinbasePart1 +
+                this.extraNonceAndSessionId +
+                submission.extraNonce2 +
+                jobTemplate.block.coinbasePart2,
             'hex',
         );
         const extraDataHashed = this.doubleSHA256(xhashbuf);
         const versionBuffer = Buffer.alloc(4);
-        versionBuffer.writeUInt32LE(jobTemplate.block.version);
+        let version = jobTemplate.block.version;
+        if (
+            this.clientConfiguration &&
+            this.clientConfiguration.versionRolling
+        ) {
+            if (
+                submission.versionMask &&
+                (parseInt(submission.versionMask, 16) &
+                    ~this.clientConfiguration.versionRollingMask) !=
+                    0
+            ) {
+                const err = new StratumErrorMessage(
+                    submission.id,
+                    eStratumErrorCode.OtherUnknown,
+                    'Invalid version mask',
+                ).response();
+                return this.write(err);
+            }
+            version &= this.clientConfiguration.versionRollingMask;
+        }
+        versionBuffer.writeUInt32LE(version);
 
         const mintComptokensResult = await this.comptoRpcService.mineComptokens(
             extraDataHashed,

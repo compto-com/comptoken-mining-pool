@@ -233,6 +233,8 @@ export class ComptoRpcService implements OnModuleInit {
         const blockTemplate: IComptoBlockTemplate = {
             version: 0x20000000,
             currentblockhash: blockHash.toString('hex'), // Example previous block hash
+            coinbasePart1: '',
+            coinbasePart2: '',
             transactions: [hexTestComptoAccount],
             bits: '180eadd8', // Compressed target representation
             timestamp: Math.floor(new Date().getTime() / 1000), // Current timestamp in UNIX epoch time
