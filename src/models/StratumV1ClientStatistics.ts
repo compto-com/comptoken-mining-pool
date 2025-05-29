@@ -1,5 +1,6 @@
 import { ClientStatisticsService } from '../ORM/client-statistics/client-statistics.service';
 import { ClientEntity } from '../ORM/client/client.entity';
+import { hasValue } from '../utils';
 
 const CACHE_SIZE = 30;
 const TARGET_SUBMISSION_PER_SECOND = 10;
@@ -38,7 +39,7 @@ export class StratumV1ClientStatistics {
             difficulty: targetDifficulty,
         });
 
-        if (this.currentTimeSlot == null) {
+        if (!hasValue(this.currentTimeSlot)) {
             // First record, insert it
             this.currentTimeSlot = timeSlot;
             this.shares += targetDifficulty;
@@ -77,7 +78,7 @@ export class StratumV1ClientStatistics {
             });
             this.lastSave = new Date().getTime();
         } else if (
-            this.lastSave != null && // always true
+            hasValue(this.lastSave) && // always true
             date.getTime() - 60 * 1000 > this.lastSave
         ) {
             // If we haven't saved for a minute, update the table

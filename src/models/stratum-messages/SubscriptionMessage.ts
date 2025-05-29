@@ -1,6 +1,7 @@
 import { Expose, Transform } from 'class-transformer';
 import { IsArray, IsString, MaxLength } from 'class-validator';
 
+import { hasValue } from '../../utils';
 import { eRequestMethod } from '../enums/eRequestMethod';
 import { StratumBaseMessage } from './StratumBaseMessage';
 
@@ -12,9 +13,9 @@ export class SubscriptionMessage extends StratumBaseMessage {
     @IsString()
     @MaxLength(128)
     @Transform(({ value: _value, key: _key, obj, type: _type }) => {
-        return obj?.params?.[0] == null
-            ? 'unknown'
-            : SubscriptionMessage.refineUserAgent(obj.params[0]);
+        return hasValue(obj?.params?.[0])
+            ? SubscriptionMessage.refineUserAgent(obj.params[0])
+            : 'unknown';
     })
     public userAgent!: string;
 

@@ -25,6 +25,7 @@ import {
     sendAndConfirmTransaction,
     Transaction,
 } from '@solana/web3.js';
+import { hasValue } from '../utils';
 
 @Injectable()
 export class ComptoRpcService implements OnModuleInit {
@@ -38,7 +39,7 @@ export class ComptoRpcService implements OnModuleInit {
         Buffer.alloc(0), // Initial value, will be replaced on first poll
     );
     public newBlock$ = this._newBlock$.pipe(
-        filter((block) => block != null),
+        filter((block) => hasValue(block)),
         shareReplay({ refCount: true, bufferSize: 1 }),
     );
 
@@ -64,7 +65,7 @@ export class ComptoRpcService implements OnModuleInit {
     async onModuleInit() {
         const solana_cluster = this.configService.get('SOLANA_CLUSTER');
         assert(
-            solana_cluster != null && solana_cluster != undefined,
+            hasValue(solana_cluster),
             'SOLANA_CLUSTER must be set in the config',
         );
         this.solana_cluster = solana_cluster;
@@ -131,7 +132,7 @@ export class ComptoRpcService implements OnModuleInit {
         timestamp: number,
     ) {
         assert(
-            this.blockHash != null,
+            hasValue(this.blockHash),
             'Block hash must be set before mining comptokens',
         );
         const testuser_compto_pubkey = getAssociatedTokenAddressSync(
@@ -210,8 +211,8 @@ export class ComptoRpcService implements OnModuleInit {
     public async pollMiningInfo() {
         const miningInfo = await this.getMiningInfo();
         if (
-            this.blockHash == null ||
-            (miningInfo != null && !miningInfo.equals(this.blockHash))
+            !hasValue(this.blockHash) ||
+            (hasValue(miningInfo) && !miningInfo.equals(this.blockHash))
         ) {
             console.log('blockhash change!!!');
             this._newBlock$.next(miningInfo);

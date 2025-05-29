@@ -13,6 +13,7 @@ import {
     IJobTemplate,
     StratumV1JobsService,
 } from '../services/stratum-v1-jobs.service';
+import { hasValue } from '../utils';
 import { eRequestMethod } from './enums/eRequestMethod';
 import { eResponseMethod } from './enums/eResponseMethod';
 import { eStratumErrorCode } from './enums/eStratumErrorCode';
@@ -75,11 +76,11 @@ export class StratumV1Client {
     }
 
     public async destroy() {
-        if (this.extraNonceAndSessionId) {
+        if (hasValue(this.extraNonceAndSessionId)) {
             await this.clientService.delete(this.extraNonceAndSessionId);
         }
 
-        if (this.stratumSubscription != null) {
+        if (hasValue(this.stratumSubscription)) {
             this.stratumSubscription.unsubscribe();
         }
 
@@ -183,8 +184,8 @@ export class StratumV1Client {
         }
 
         if (
-            this.clientSubscription != null &&
-            this.clientAuthorization != null &&
+            hasValue(this.clientSubscription) &&
+            hasValue(this.clientAuthorization) &&
             this.stratumInitialized == false
         ) {
             await this.initStratum();
@@ -196,14 +197,14 @@ export class StratumV1Client {
             parsedMessage,
             SubscriptionMessage,
         );
-        if (validationResult.error) {
+        if (hasValue(validationResult.error)) {
             console.error('Invalid subscription message');
             return validationResult.error;
         }
         const subscriptionMessage =
             validationResult.result as SubscriptionMessage;
 
-        if (this.sessionStart == null) {
+        if (!hasValue(this.sessionStart)) {
             this.sessionStart = new Date();
             this.statistics = new StratumV1ClientStatistics(
                 this.clientStatisticsService,
@@ -229,7 +230,7 @@ export class StratumV1Client {
             parsedMessage,
             ConfigurationMessage,
         );
-        if (validationResult.error) {
+        if (hasValue(validationResult.error)) {
             console.error('Invalid configuration message');
             return validationResult.error;
         }
@@ -249,7 +250,7 @@ export class StratumV1Client {
             parsedMessage,
             AuthorizationMessage,
         );
-        if (validationResult.error) {
+        if (hasValue(validationResult.error)) {
             console.error('Invalid authorization message');
             return validationResult.error;
         }
@@ -267,7 +268,7 @@ export class StratumV1Client {
             parsedMessage,
             MiningSubmitMessage,
         );
-        if (validationResult.error) {
+        if (hasValue(validationResult.error)) {
             console.error('Invalid mining submit message');
             return validationResult.error;
         }
@@ -276,7 +277,7 @@ export class StratumV1Client {
 
         if (
             this.clientConfiguration?.versionRolling &&
-            !miningSubmitMessage.versionMask
+            !hasValue(miningSubmitMessage.versionMask)
         ) {
             // If version rolling is enabled, the version mask is required
             const err = new StratumErrorMessage(
@@ -300,7 +301,14 @@ export class StratumV1Client {
     private async initStratum() {
         console.log('Initializing stratum');
         console.log('oooooooooooooooooooooooooo');
-        assert(this.clientSubscription != null, 'Client subscription is null');
+        assert(
+            hasValue(this.clientSubscription),
+            'Client subscription is null',
+        );
+        assert(
+            hasValue(this.clientAuthorization),
+            'Client autorization is null',
+        );
 
         this.stratumInitialized = true;
 
@@ -359,13 +367,13 @@ export class StratumV1Client {
     }
 
     private async handleMiningSubmission(submission: MiningSubmitMessage) {
-        if (this.entity == null) {
-            if (this.creatingEntity == null) {
+        if (!hasValue(this.entity)) {
+            if (!hasValue(this.creatingEntity)) {
                 this.creatingEntity = new Promise(async (resolve, reject) => {
                     try {
-                        assert(this.extraNonceAndSessionId != null);
-                        assert(this.clientAuthorization != null);
-                        assert(this.clientSubscription != null);
+                        assert(hasValue(this.extraNonceAndSessionId));
+                        assert(hasValue(this.clientAuthorization));
+                        assert(hasValue(this.clientSubscription));
                         this.entity = await this.clientService.insert({
                             sessionId: this.extraNonceAndSessionId ?? undefined,
                             address: this.clientAuthorization.address,
@@ -388,22 +396,19 @@ export class StratumV1Client {
         const job = this.stratumV1JobsService.getJobById(submission.jobId);
 
         // a miner may submit a job that doesn't exist anymore if it was removed by a new block notification
-        if (job == null) {
+        if (!hasValue(job)) {
             const err = new StratumErrorMessage(
                 submission.id,
                 eStratumErrorCode.JobNotFound,
                 'Job not found',
             ).response();
-            const success = await this.write(err);
-            if (!success) {
-                return false;
-            }
+            await this.write(err);
             return false;
         }
         const jobTemplate = this.stratumV1JobsService.getJobTemplateById(
             job.jobTemplateId,
         );
-        assert(jobTemplate != null, 'Job template not found');
+        assert(hasValue(jobTemplate), 'Job template not found');
 
         const xhashbuf = Buffer.from(
             jobTemplate.block.coinbasePart1 +
@@ -416,11 +421,11 @@ export class StratumV1Client {
         const versionBuffer = Buffer.alloc(4);
         let version = jobTemplate.block.version;
         if (
-            this.clientConfiguration &&
+            hasValue(this.clientConfiguration) &&
             this.clientConfiguration.versionRolling
         ) {
             if (
-                submission.versionMask &&
+                hasValue(submission.versionMask) &&
                 (parseInt(submission.versionMask, 16) &
                     ~this.clientConfiguration.versionRollingMask) !=
                     0
@@ -443,7 +448,7 @@ export class StratumV1Client {
             parseInt(submission.ntime, 16),
         );
 
-        if (mintComptokensResult.error != null) {
+        if (hasValue(mintComptokensResult.error)) {
             switch (mintComptokensResult.error) {
                 case 'Difficulty too low': {
                     const err = new StratumErrorMessage(
@@ -497,13 +502,13 @@ export class StratumV1Client {
 
     private async checkDifficulty() {
         assert(
-            this.statistics != null,
+            hasValue(this.statistics),
             'Statistics service is not initialized',
         );
         const targetDiff = this.statistics.getSuggestedDifficulty(
             this.sessionDifficulty,
         );
-        if (targetDiff == null) {
+        if (!hasValue(targetDiff)) {
             return;
         }
 

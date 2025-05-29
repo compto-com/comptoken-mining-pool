@@ -4,6 +4,7 @@ import { Server, Socket } from 'net';
 import { StratumV1Client } from '../models/StratumV1Client';
 import { ClientStatisticsService } from '../ORM/client-statistics/client-statistics.service';
 import { ClientService } from '../ORM/client/client.service';
+import { hasValue } from '../utils';
 import { ComptoRpcService } from './compto-rpc.service';
 import { StratumV1JobsService } from './stratum-v1-jobs.service';
 
@@ -39,7 +40,7 @@ export class StratumV1Service implements OnModuleInit {
             );
 
             socket.on('close', async (hadError: boolean) => {
-                if (client.extraNonceAndSessionId != null) {
+                if (hasValue(client.extraNonceAndSessionId)) {
                     // Handle socket disconnection
                     await client.destroy();
                     console.log(

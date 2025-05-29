@@ -15,6 +15,7 @@ import { ClientModule } from '../ORM/client/client.module';
 import { ClientService } from '../ORM/client/client.service';
 import { ComptoRpcService as MockComptoRpcService } from '../services/compto-rpc.service';
 import { StratumV1JobsService } from '../services/stratum-v1-jobs.service';
+import { hasValue } from '../utils';
 import { StratumV1Client } from './StratumV1Client';
 
 jest.mock('../services/compto-rpc.service');
@@ -130,7 +131,7 @@ describe('StratumV1Client', () => {
     });
 
     afterEach(async () => {
-        if (client) {
+        if (hasValue(client)) {
             client.destroy();
         }
         jest.useRealTimers();

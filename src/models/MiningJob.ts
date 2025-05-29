@@ -1,4 +1,5 @@
 import { IJobTemplate } from '../services/stratum-v1-jobs.service';
+import { hasValue } from '../utils';
 import { eResponseMethod } from './enums/eResponseMethod';
 import { IMiningNotify } from './stratum-messages/IMiningNotify';
 
@@ -53,7 +54,7 @@ export class MiningJob {
         }
         // Split the string into pairs of two characters (bytes)
         const byteArray = hexString.match(/.{2}/g);
-        if (!byteArray) {
+        if (!hasValue(byteArray)) {
             return ''; // Return an empty string if the hex string was empty
         }
         const reversedArray = byteArray.reverse();

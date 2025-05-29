@@ -3,6 +3,7 @@ import { Controller, Get, NotFoundException, Param } from '@nestjs/common';
 import { AddressSettingsService } from '../../ORM/address-settings/address-settings.service';
 import { ClientStatisticsService } from '../../ORM/client-statistics/client-statistics.service';
 import { ClientService } from '../../ORM/client/client.service';
+import { hasValue } from '../../utils';
 
 @Controller('client')
 export class ClientController {
@@ -83,7 +84,7 @@ export class ClientController {
             workerName,
             sessionId,
         );
-        if (worker == null) {
+        if (!hasValue(worker)) {
             return new NotFoundException();
         }
         const chartData =

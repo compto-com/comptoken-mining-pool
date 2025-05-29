@@ -15,6 +15,7 @@ import {
 
 import { IComptoBlockTemplate } from '../models/compto-rpc/ComptoBlockTemplate';
 import { MiningJob } from '../models/MiningJob';
+import { hasValue } from '../utils';
 import { ComptoRpcService } from './compto-rpc.service';
 
 export interface IJobTemplate {
@@ -35,15 +36,14 @@ export class StratumV1JobsService {
     public latestJobId: number = 1;
     public latestJobTemplateId: number = 1;
 
-    public jobs: { [jobId: string]: MiningJob } = {};
+    public jobs: { [jobId: string]: MiningJob | undefined } = {};
 
-    public blocks: { [id: string]: IJobTemplate } = {};
+    public blocks: { [id: string]: IJobTemplate | undefined } = {};
 
     // offset the interval so that all the cluster processes don't try and refresh at the same time.
-    private delay =
-        process.env.NODE_APP_INSTANCE == null
-            ? 0
-            : parseInt(process.env.NODE_APP_INSTANCE) * 5000;
+    private delay = hasValue(process.env.NODE_APP_INSTANCE)
+        ? parseInt(process.env.NODE_APP_INSTANCE) * 5000
+        : 0;
 
     constructor(private readonly comptoRpcService: ComptoRpcService) {
         this.newMiningJob$ = combineLatest([
@@ -92,14 +92,14 @@ export class StratumV1JobsService {
                 };
                 return comptoJob;
             }),
-            filter((next) => next != null),
-            map((data) => data as IJobTemplate), // Ensure type safety
-            tap<IJobTemplate>((data) => {
-                if (data.blockData.clearJobs) {
+            filter((template) => hasValue(template)),
+            map((template) => template as IJobTemplate), // Ensure type safety
+            tap((template) => {
+                if (template.blockData.clearJobs) {
                     this.blocks = {};
                     this.jobs = {};
                 }
-                this.blocks[data.blockData.id] = data;
+                this.blocks[template.blockData.id] = template;
             }),
             shareReplay({ refCount: true, bufferSize: 1 }),
         );
@@ -117,7 +117,7 @@ export class StratumV1JobsService {
         return difficulty;
     }
 
-    public getJobTemplateById(jobTemplateId: string): IJobTemplate | null {
+    public getJobTemplateById(jobTemplateId: string) {
         return this.blocks[jobTemplateId];
     }
 

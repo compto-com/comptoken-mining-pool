@@ -8,6 +8,7 @@ import {
     MaxLength,
 } from 'class-validator';
 
+import { hasValue } from '../../utils';
 import { eRequestMethod } from '../enums/eRequestMethod';
 import { IsComptokenAddress } from '../validators/bitcoin-address.validator';
 import { StratumBaseMessage } from './StratumBaseMessage';
@@ -30,9 +31,9 @@ export class AuthorizationMessage extends StratumBaseMessage {
     @IsString()
     @MaxLength(64)
     @Transform(({ value: _value, key: _key, obj, type: _type }) => {
-        return obj.params[0].split('.')[1] == null
-            ? 'worker'
-            : obj.params[0].split('.')[1];
+        return hasValue(obj.params[0].split('.')[1])
+            ? obj.params[0].split('.')[1]
+            : 'worker';
     })
     public worker!: string;
 

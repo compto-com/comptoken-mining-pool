@@ -5,6 +5,7 @@ import assert from 'assert/strict';
 import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import { ObjectLiteral, Repository } from 'typeorm';
 
+import { hasValue } from '../../utils';
 import { ClientEntity } from './client.entity';
 
 @Injectable()
@@ -138,7 +139,7 @@ export class ClientService {
                 sessionId,
             },
         });
-        assert(existingClient != null, 'Client not found');
+        assert(hasValue(existingClient), 'Client not found');
         return existingClient;
     }
 
