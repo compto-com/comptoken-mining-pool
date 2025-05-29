@@ -17,7 +17,6 @@ import { hasValue } from '../utils';
 import { eRequestMethod } from './enums/eRequestMethod';
 import { eResponseMethod } from './enums/eResponseMethod';
 import { eStratumErrorCode } from './enums/eStratumErrorCode';
-import { MiningJob } from './MiningJob';
 import { AuthorizationMessage } from './stratum-messages/AuthorizationMessage';
 import { ConfigurationMessage } from './stratum-messages/ConfigurationMessage';
 import { MiningSubmitMessage } from './stratum-messages/MiningSubmitMessage';
@@ -31,7 +30,6 @@ export class StratumV1Client {
     private clientSubscription: SubscriptionMessage | null = null;
     private clientConfiguration: ConfigurationMessage | null = null;
     private clientAuthorization: AuthorizationMessage | null = null;
-    private clientSuggestedDifficulty: SuggestDifficulty | null = null;
     private stratumSubscription: Subscription | null = null;
     private backgroundWork: NodeJS.Timeout[] = [];
 
@@ -316,18 +314,21 @@ export class StratumV1Client {
         switch (this.clientSubscription.userAgent) {
             case 'cpuminer': {
                 this.sessionDifficulty = 0.01;
+                break;
+            }
+            default: {
+                this.sessionDifficulty = 16384; // Default difficulty for comptokens
+                break;
             }
         }
 
-        if (this.clientSuggestedDifficulty == null) {
-            const setDifficulty = JSON.stringify(
-                new SuggestDifficulty().response(this.sessionDifficulty),
-            );
-            console.log('Setting difficulty to: ', setDifficulty);
-            const success = await this.write(setDifficulty + '\n');
-            if (!success) {
-                return;
-            }
+        const setDifficulty = JSON.stringify(
+            new SuggestDifficulty().response(this.sessionDifficulty),
+        );
+        console.log('Setting difficulty to: ', setDifficulty);
+        const success = await this.write(setDifficulty + '\n');
+        if (!success) {
+            return;
         }
 
         this.stratumSubscription =
@@ -353,12 +354,7 @@ export class StratumV1Client {
         console.log('Sending new job');
         console.log(jobTemplate);
 
-        const job = new MiningJob(
-            this.stratumV1JobsService.getNextId(),
-            jobTemplate,
-        );
-
-        this.stratumV1JobsService.addJob(job);
+        const job = this.stratumV1JobsService.addJob(jobTemplate);
 
         const success = await this.write(job.response(jobTemplate));
         if (!success) {

@@ -217,8 +217,12 @@ describe('StratumV1Client', () => {
         socketEmitter(Buffer.from(MockRecording1.MINING_SUBSCRIBE));
         socketEmitter(Buffer.from(MockRecording1.MINING_AUTHORIZE));
         await new Promise((r) => setTimeout(r, 100));
+        socketEmitter(Buffer.from(MockRecording1.MINING_SUBMIT));
+        await new Promise((r) => setTimeout(r, 100));
+        await clientService.insertClients();
 
         const clientCount = await clientService.connectedClientCount();
+        console.error(`Connected clients: ${clientCount}`);
         expect(clientCount).toBe(1);
     });
 
@@ -246,8 +250,8 @@ describe('StratumV1Client', () => {
                 id: null,
                 method: 'mining.notify',
                 params: [
-                    '1',
-                    '171592f223740e92d223f6e68bff25279af7ac4f2246451e0000000200000000',
+                    '2', // jobId
+                    '171592f223740e92d223f6e68bff25279af7ac4f2246451e0000000200000000', // currentBlockhash
                     '', // coinbasePart1
                     '', // coinbasePart2
                     [], // transactions

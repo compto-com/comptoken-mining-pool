@@ -77,13 +77,10 @@ export class StratumV1JobsService {
 
                 this.lastIntervalCount = interval;
 
-                const id = this.getNextTemplateId();
-                this.latestJobTemplateId++;
-
                 const comptoJob: IJobTemplate = {
                     block: blockTemplate,
                     blockData: {
-                        id,
+                        id: this.getNextTemplateId(),
                         networkDifficulty: this.calculateNetworkDifficulty(
                             parseInt(blockTemplate.bits, 16),
                         ),
@@ -121,9 +118,11 @@ export class StratumV1JobsService {
         return this.blocks[jobTemplateId];
     }
 
-    public addJob(job: MiningJob) {
+    public addJob(template: IJobTemplate) {
+        const jobId = this.getNextId();
+        const job = new MiningJob(jobId, template);
         this.jobs[job.jobId] = job;
-        this.latestJobId++;
+        return job;
     }
 
     public getJobById(jobId: string) {
@@ -131,9 +130,11 @@ export class StratumV1JobsService {
     }
 
     public getNextTemplateId() {
+        this.latestJobTemplateId++;
         return this.latestJobTemplateId.toString(16);
     }
     public getNextId() {
+        this.latestJobId++;
         return this.latestJobId.toString(16);
     }
 }

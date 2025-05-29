@@ -37,5 +37,5 @@ export class MockRecording1 {
         //default_witness_commitment:
         //'6a24aa21a9edbd3d1d916aa0b57326a2d88ebe1b68a1d7c48585f26d8335fe6a94b62755f64c',
     };
-    public static MINING_SUBMIT = `{"id": 5, "method": "mining.submit", "params": ["tb1qumezefzdeqqwn5zfvgdrhxjzc5ylr39uhuxcz4.bitaxe3", "1", "c7080000", "64b3f3ec", "ed460d91", "00002000"]}\n`;
+    public static MINING_SUBMIT = `{"id": 5, "method": "mining.submit", "params": ["tb1qumezefzdeqqwn5zfvgdrhxjzc5ylr39uhuxcz4.bitaxe3", "2", "c7080000", "64b3f3ec", "ed460d91", "00002000"]}\n`;
 }
