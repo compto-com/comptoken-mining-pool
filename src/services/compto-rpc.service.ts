@@ -1,5 +1,4 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import assert from 'assert/strict';
 import * as fs from 'fs';
 import { BehaviorSubject, filter, shareReplay } from 'rxjs';
 
@@ -25,7 +24,7 @@ import {
     sendAndConfirmTransaction,
     Transaction,
 } from '@solana/web3.js';
-import { hasValue } from '../utils';
+import { assert, hasValue } from '../utils';
 
 @Injectable()
 export class ComptoRpcService implements OnModuleInit {

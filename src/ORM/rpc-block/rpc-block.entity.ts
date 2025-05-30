@@ -6,8 +6,8 @@ export class RpcBlockEntity {
     blockHeight!: number;
 
     @Column({ nullable: true })
-    lockedBy?: string | null;
+    lockedBy?: string;
 
     @Column({ nullable: true })
-    data?: string | null;
+    data?: string;
 }

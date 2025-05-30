@@ -1,17 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import assert from 'assert/strict';
 import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import { ObjectLiteral, Repository } from 'typeorm';
 
-import { hasValue } from '../../utils';
+import { assert, hasValue } from '../../utils';
 import { ClientEntity } from './client.entity';
 
 @Injectable()
 export class ClientService {
     public insertQueue: {
-        result: BehaviorSubject<ObjectLiteral | null>;
+        result: BehaviorSubject<ObjectLiteral>;
         partialClient: Partial<ClientEntity>;
     }[] = [];
 
@@ -65,7 +64,7 @@ export class ClientService {
     public async insert(
         partialClient: Partial<ClientEntity>,
     ): Promise<ClientEntity> {
-        const result = new BehaviorSubject(null as ObjectLiteral | null);
+        const result = new BehaviorSubject({});
 
         this.insertQueue.push({ result, partialClient });
 

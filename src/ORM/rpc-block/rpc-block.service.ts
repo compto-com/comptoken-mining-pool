@@ -19,7 +19,7 @@ export class RpcBlockService {
     public lockBlock(blockHeight: number, process: string) {
         return this.rpcBlockRepository.save({
             blockHeight,
-            data: null,
+            data: undefined,
             lockedBy: process,
         });
     }

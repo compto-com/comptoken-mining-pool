@@ -13,7 +13,7 @@ import {
     IJobTemplate,
     StratumV1JobsService,
 } from '../services/stratum-v1-jobs.service';
-import { hasValue } from '../utils';
+import { assert, hasValue } from '../utils';
 import { eRequestMethod } from './enums/eRequestMethod';
 import { eResponseMethod } from './enums/eResponseMethod';
 import { eStratumErrorCode } from './enums/eStratumErrorCode';
@@ -568,12 +568,5 @@ export class StratumV1Client {
             );
             return false;
         }
-    }
-}
-
-// for some reason importing 'assert' from 'node:assert' isn't working
-function assert(condition: any, message?: string): asserts condition {
-    if (!condition) {
-        throw new Error(message || 'Assertion failed');
     }
 }
