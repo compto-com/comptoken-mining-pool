@@ -2,17 +2,17 @@
 # Docker build environment #
 ############################
 
-FROM node:18.16.1-bookworm-slim AS build
+FROM node:20-bookworm-slim AS build
 
 # Upgrade all packages and install dependencies
 RUN apt-get update \
     && apt-get upgrade -y
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        python3 \
-        build-essential \
-        cmake \
-        curl \
-        ca-certificates \
+    python3 \
+    build-essential \
+    cmake \
+    curl \
+    ca-certificates \
     && apt clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 WORKDIR /build
@@ -26,7 +26,7 @@ RUN npm i && npm run build
 # Docker final environment #
 ############################
 
-FROM node:18.16.1-bookworm-slim
+FROM node:20-bookworm-slim
 
 # Expose ports for Stratum and Bitcoin RPC
 EXPOSE 3333 3334
