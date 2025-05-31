@@ -459,6 +459,9 @@ export class StratumV1Client {
                     return false;
                 }
                 default: {
+                    console.error(
+                        `Error mining comptokens: ${mintComptokensResult.error}`,
+                    );
                     const err = new StratumErrorMessage(
                         submission.id,
                         eStratumErrorCode.OtherUnknown,

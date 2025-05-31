@@ -43,20 +43,17 @@ export class ComptoRpcService implements OnModuleInit {
     );
 
     constructor(private readonly configService: ConfigService) {
-        const solana_user =
-            (this.configService.get('SOLANA_USER') == ''
-                ? undefined
-                : this.configService.get('SOLANA_USER')) ??
-            Buffer.from(
-                JSON.parse(
-                    fs.readFileSync(
-                        this.configService.getOrThrow('SOLANA_USER_PATH'),
-                        'utf-8',
-                    ),
-                ),
-            );
-
-        console.log(`solana_user: ${solana_user}`);
+        const solana_user_raw = this.configService.get('SOLANA_USER');
+        const solana_user = Buffer.from(
+            JSON.parse(
+                solana_user_raw == ''
+                    ? fs.readFileSync(
+                          this.configService.getOrThrow('SOLANA_USER_PATH'),
+                          'utf-8',
+                      )
+                    : solana_user_raw,
+            ),
+        );
 
         this.user_keypair = Keypair.fromSecretKey(solana_user);
     }
