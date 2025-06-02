@@ -10,7 +10,7 @@ import {
 
 import { hasValue } from '../../utils';
 import { eRequestMethod } from '../enums/eRequestMethod';
-import { IsComptokenAddress } from '../validators/bitcoin-address.validator';
+import { IsComptokenAddress } from '../validators/comptoken-address.validator';
 import { StratumBaseMessage } from './StratumBaseMessage';
 
 export class AuthorizationMessage extends StratumBaseMessage {

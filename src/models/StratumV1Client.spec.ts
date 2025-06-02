@@ -20,7 +20,7 @@ import { StratumV1Client } from './StratumV1Client';
 
 jest.mock('../services/compto-rpc.service');
 
-jest.mock('./validators/bitcoin-address.validator', () => ({
+jest.mock('./validators/comptoken-address.validator', () => ({
     IsComptokenAddress() {
         return jest.fn();
     },

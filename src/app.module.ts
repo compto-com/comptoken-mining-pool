@@ -7,7 +7,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AppController } from './app.controller';
 import { ClientController } from './controllers/client/client.controller';
-import { ComptokenAddressValidator } from './models/validators/bitcoin-address.validator';
+import { ComptokenAddressValidator } from './models/validators/comptoken-address.validator';
 import { AddressSettingsModule } from './ORM/address-settings/address-settings.module';
 import { BlocksModule } from './ORM/blocks/blocks.module';
 import { ClientStatisticsModule } from './ORM/client-statistics/client-statistics.module';

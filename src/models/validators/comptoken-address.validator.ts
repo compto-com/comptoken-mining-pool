@@ -11,7 +11,6 @@ import {
 @Injectable()
 export class ComptokenAddressValidator implements ValidatorConstraintInterface {
     validate(value: string): boolean {
-        return true; // originally validated bitcoin addresses, disabled for now b/c it doesn't work yet
         try {
             new PublicKey(value);
             // TODO: Check if it's a token account with the correct mint
@@ -29,7 +28,7 @@ export class ComptokenAddressValidator implements ValidatorConstraintInterface {
 export function IsComptokenAddress(validationOptions?: ValidationOptions) {
     return function (object: object, propertyName: string) {
         registerDecorator({
-            name: 'isBitcoinAddress',
+            name: 'isComptokenAddress',
             target: object.constructor,
             propertyName: propertyName,
             constraints: [],
