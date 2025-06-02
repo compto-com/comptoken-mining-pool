@@ -69,9 +69,18 @@ describe('StratumV1Client', () => {
                                     return 'tb1qumezefzdeqqwn5zfvgdrhxjzc5ylr39uhuxcz4';
                                 case 'NETWORK':
                                     return 'testnet';
+                                case 'SOLANA_USER':
+                                    return '[139,213,84,120,244,40,122,74,179,90,146,128,49,120,237,17,191,242,118,123,14,170,241,142,42,39,157,78,139,34,95,63,255,22,35,190,4,231,156,200,108,132,200,209,236,204,10,79,198,65,98,199,1,96,246,42,208,183,163,32,54,176,27,238]';
                             }
                             return null;
                         }),
+                        getOrThrow: function (key: string) {
+                            const value = this.get(key);
+                            if (!hasValue(value)) {
+                                throw new Error(`Config key ${key} not found`);
+                            }
+                            return value;
+                        },
                     },
                 },
             ],
@@ -123,6 +132,7 @@ describe('StratumV1Client', () => {
             clientService,
             clientStatisticsService,
             comptoRpcService,
+            moduleRef.get(ConfigService),
         );
 
         client.extraNonceAndSessionId = MockRecording1.EXTRA_NONCE;
@@ -235,7 +245,7 @@ describe('StratumV1Client', () => {
             Promise.resolve(true),
         );
 
-        (comptoRpcService.mineComptokens as jest.Mock).mockImplementation(() =>
+        (comptoRpcService.submitProof as jest.Mock).mockImplementation(() =>
             Promise.resolve({ result: 'mocked result' }),
         );
 

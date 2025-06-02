@@ -5,6 +5,8 @@ import { Socket } from 'net';
 import { firstValueFrom, Subscription } from 'rxjs';
 import { clearInterval } from 'timers';
 
+import { ConfigService } from '@nestjs/config';
+import { PublicKey } from '@solana/web3.js';
 import { ClientStatisticsService } from '../ORM/client-statistics/client-statistics.service';
 import { ClientEntity } from '../ORM/client/client.entity';
 import { ClientService } from '../ORM/client/client.service';
@@ -53,6 +55,7 @@ export class StratumV1Client {
         private readonly clientService: ClientService,
         private readonly clientStatisticsService: ClientStatisticsService,
         private readonly comptoRpcService: ComptoRpcService,
+        private readonly configService: ConfigService,
     ) {
         console.log('StratumV1Client created');
         this.socket.on('data', (data: Buffer) => {
@@ -363,6 +366,10 @@ export class StratumV1Client {
     }
 
     private async handleMiningSubmission(submission: MiningSubmitMessage) {
+        assert(
+            hasValue(this.clientAuthorization),
+            'Client authorization is null',
+        );
         if (!hasValue(this.entity)) {
             if (!hasValue(this.creatingEntity)) {
                 this.creatingEntity = new Promise(async (resolve, reject) => {
@@ -437,11 +444,18 @@ export class StratumV1Client {
         }
         versionBuffer.writeUInt32LE(version);
 
-        const mintComptokensResult = await this.comptoRpcService.mineComptokens(
+        const FEE = this.configService.get<number>(
+            'FEE',
+            1_00, // 1% of 100_00 COMP
+        );
+        assert(0 <= FEE && FEE <= 100_00, 'FEE must be between 0 and 100_00');
+        const mintComptokensResult = await this.comptoRpcService.submitProof(
             extraDataHashed,
             parseInt(submission.nonce, 16),
             jobTemplate.block.version,
             parseInt(submission.ntime, 16),
+            new PublicKey(this.clientAuthorization.address),
+            FEE,
         );
 
         if (hasValue(mintComptokensResult.error)) {
