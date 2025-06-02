@@ -232,7 +232,7 @@ export class ComptoRpcService implements OnModuleInit {
             );
             console.log('Transfer result:', transferResult);
 
-            return { result: true };
+            return { result: transferResult };
         } catch (e) {
             console.error(
                 'Error processing fees',
@@ -277,6 +277,8 @@ export class ComptoRpcService implements OnModuleInit {
             return { error: mineResult.error };
         }
 
+        console.log('Mine Transaction Signature:', mineResult.result);
+
         const processFeesResult = await this.processFees(
             compto_comptoken_pubkey,
             recipient,
@@ -285,6 +287,9 @@ export class ComptoRpcService implements OnModuleInit {
         if (processFeesResult.error) {
             return { error: processFeesResult.error };
         }
+
+        console.log('Fees Transaction Signature:', processFeesResult.result);
+
         return { result: true };
     }
 
