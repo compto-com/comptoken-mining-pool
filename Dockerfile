@@ -17,10 +17,10 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
 
 WORKDIR /build
 
-COPY . .
+COPY .env src package.json package-lock.json tsconfig.build.json tsconfig.json ./
 
 # Build Public Pool using NPM
-RUN npm i && npm run build
+RUN npm ci && npm run build
 
 ############################
 # Docker final environment #
