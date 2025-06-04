@@ -121,7 +121,29 @@ export class ComptoRpcService implements OnModuleInit {
                     .join(',\n')}\n` +
                 `}`,
         );
-        setInterval(this.pollMiningInfo.bind(this), 10_000);
+
+        // Poll mining info immediately on startup
+        this.pollMiningInfo();
+
+        // Schedule the next poll for midnight UTC
+        const now = new Date();
+        const nextMidnightUTC = new Date(
+            Date.UTC(
+                now.getUTCFullYear(),
+                now.getUTCMonth(),
+                now.getUTCDate() + 1,
+                0,
+                0,
+                0,
+                0,
+            ),
+        );
+        const msUntilMidnight = nextMidnightUTC.getTime() - now.getTime();
+
+        setTimeout(() => {
+            this.pollMiningInfo();
+            setInterval(this.pollMiningInfo.bind(this), 24 * 60 * 60 * 1000); // every 24h
+        }, msUntilMidnight);
     }
 
     private verifyProof(
@@ -294,15 +316,26 @@ export class ComptoRpcService implements OnModuleInit {
     }
 
     public async pollMiningInfo() {
-        const miningInfo = await this.getMiningInfo();
-        if (
-            !hasValue(this.blockHash) ||
-            (hasValue(miningInfo) && !miningInfo.equals(this.blockHash))
-        ) {
-            console.log('blockhash change!!!');
-            this._newBlock$.next(miningInfo);
-            this.blockHash = miningInfo;
-        }
+        const _pollMiningInfo = async () => {
+            const miningInfo = await this.getMiningInfo();
+            if (
+                !hasValue(this.blockHash) ||
+                (hasValue(miningInfo) && !miningInfo.equals(this.blockHash))
+            ) {
+                console.log('blockhash change!!!');
+                this._newBlock$.next(miningInfo);
+                this.blockHash = miningInfo;
+                return true;
+            }
+            return false;
+        };
+        // poll every 10 seconds until a new block hash is received
+        const interval = setInterval(async () => {
+            const done = await _pollMiningInfo();
+            if (done) {
+                clearInterval(interval);
+            }
+        }, 10_000);
     }
 
     public getBlockTemplate(blockHash: Buffer): IComptoBlockTemplate {
