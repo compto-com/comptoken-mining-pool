@@ -2,12 +2,11 @@ import { plainToInstance } from 'class-transformer';
 import { validate, ValidatorOptions } from 'class-validator';
 import * as crypto from 'crypto';
 import { Socket } from 'net';
-import { firstValueFrom, Subscription } from 'rxjs';
+import { Subscription } from 'rxjs';
 import { clearInterval } from 'timers';
 
 import { ConfigService } from '@nestjs/config';
 import { PublicKey } from '@solana/web3.js';
-import { ClientStatisticsService } from '../ORM/client-statistics/client-statistics.service';
 import { ClientEntity } from '../ORM/client/client.entity';
 import { ClientService } from '../ORM/client/client.service';
 import { ComptoRpcService } from '../services/compto-rpc.service';
@@ -17,7 +16,6 @@ import {
 } from '../services/stratum-v1-jobs.service';
 import { assert, hasValue } from '../utils';
 import { eRequestMethod } from './enums/eRequestMethod';
-import { eResponseMethod } from './enums/eResponseMethod';
 import { eStratumErrorCode } from './enums/eStratumErrorCode';
 import { AuthorizationMessage } from './stratum-messages/AuthorizationMessage';
 import { ConfigurationMessage } from './stratum-messages/ConfigurationMessage';
@@ -26,7 +24,6 @@ import { StratumBaseMessage } from './stratum-messages/StratumBaseMessage';
 import { StratumErrorMessage } from './stratum-messages/StratumErrorMessage';
 import { SubscriptionMessage } from './stratum-messages/SubscriptionMessage';
 import { SuggestDifficulty } from './stratum-messages/SuggestDifficultyMessage';
-import { StratumV1ClientStatistics } from './StratumV1ClientStatistics';
 
 export class StratumV1Client {
     private clientSubscription: SubscriptionMessage | null = null;
@@ -35,9 +32,7 @@ export class StratumV1Client {
     private stratumSubscription: Subscription | null = null;
     private backgroundWork: NodeJS.Timeout[] = [];
 
-    private statistics: StratumV1ClientStatistics | null = null;
     private stratumInitialized = false;
-    private sessionDifficulty: number = 16384;
 
     private entity: ClientEntity | null = null;
     private creatingEntity: Promise<void> | null = null;
@@ -53,7 +48,6 @@ export class StratumV1Client {
         public readonly socket: Socket,
         private readonly stratumV1JobsService: StratumV1JobsService,
         private readonly clientService: ClientService,
-        private readonly clientStatisticsService: ClientStatisticsService,
         private readonly comptoRpcService: ComptoRpcService,
         private readonly configService: ConfigService,
     ) {
@@ -207,9 +201,6 @@ export class StratumV1Client {
 
         if (!hasValue(this.sessionStart)) {
             this.sessionStart = new Date();
-            this.statistics = new StratumV1ClientStatistics(
-                this.clientStatisticsService,
-            );
             this.extraNonceAndSessionId = this.getRandomHexString();
             console.log(
                 `New client ID: : ${this.extraNonceAndSessionId}, ${this.socket.remoteAddress}:${this.socket.remotePort}`,
@@ -314,19 +305,20 @@ export class StratumV1Client {
         this.stratumInitialized = true;
 
         console.log('user agent: ', this.clientSubscription.userAgent);
+        let sessionDifficulty: number;
         switch (this.clientSubscription.userAgent) {
             case 'cpuminer': {
-                this.sessionDifficulty = 0.01;
+                sessionDifficulty = 0.01;
                 break;
             }
             default: {
-                this.sessionDifficulty = 16384; // Default difficulty for comptokens
+                sessionDifficulty = 16384; // TODO: where does this come from? should it be something else? configurable?
                 break;
             }
         }
 
         const setDifficulty = JSON.stringify(
-            new SuggestDifficulty().response(this.sessionDifficulty),
+            new SuggestDifficulty().response(sessionDifficulty),
         );
         console.log('Setting difficulty to: ', setDifficulty);
         const success = await this.write(setDifficulty + '\n');
@@ -345,12 +337,6 @@ export class StratumV1Client {
                     }
                 },
             );
-
-        this.backgroundWork.push(
-            setInterval(async () => {
-                await this.checkDifficulty();
-            }, 60 * 1000),
-        );
     }
 
     private async sendNewMiningJob(jobTemplate: IJobTemplate) {
@@ -511,40 +497,6 @@ export class StratumV1Client {
             .update(firstHash)
             .digest();
         return secondHash;
-    }
-
-    private async checkDifficulty() {
-        assert(
-            hasValue(this.statistics),
-            'Statistics service is not initialized',
-        );
-        const targetDiff = this.statistics.getSuggestedDifficulty(
-            this.sessionDifficulty,
-        );
-        if (!hasValue(targetDiff)) {
-            return;
-        }
-
-        if (targetDiff != this.sessionDifficulty) {
-            this.sessionDifficulty = targetDiff;
-
-            const data =
-                JSON.stringify({
-                    id: null,
-                    method: eResponseMethod.SET_DIFFICULTY,
-                    params: [targetDiff],
-                }) + '\n';
-
-            await this.socket.write(data);
-            console.log('start to await newMiningJob$.');
-            const jobTemplate = await firstValueFrom(
-                this.stratumV1JobsService.newMiningJob$,
-            );
-            console.log('finish await newMiningJob$');
-            // we need to clear the jobs so that the difficulty set takes effect. Otherwise the different miner implementations can cause issues
-            jobTemplate.blockData.clearJobs = true;
-            await this.sendNewMiningJob(jobTemplate);
-        }
     }
 
     private async write(message: string): Promise<boolean> {

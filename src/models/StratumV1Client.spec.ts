@@ -7,9 +7,6 @@ import { DataSource } from 'typeorm';
 
 import { MockRecording1 } from '../../test/models/MockRecording1';
 import { AddressSettingsModule } from '../ORM/address-settings/address-settings.module';
-import { ClientStatisticsEntity } from '../ORM/client-statistics/client-statistics.entity';
-import { ClientStatisticsModule } from '../ORM/client-statistics/client-statistics.module';
-import { ClientStatisticsService } from '../ORM/client-statistics/client-statistics.service';
 import { ClientEntity } from '../ORM/client/client.entity';
 import { ClientModule } from '../ORM/client/client.module';
 import { ClientService } from '../ORM/client/client.service';
@@ -32,7 +29,6 @@ describe('StratumV1Client', () => {
     let comptoRpcService: MockComptoRpcService;
 
     let clientService: ClientService;
-    let clientStatisticsService: ClientStatisticsService;
 
     let client: StratumV1Client;
 
@@ -56,7 +52,6 @@ describe('StratumV1Client', () => {
                     logging: false,
                 }),
                 ClientModule,
-                ClientStatisticsModule,
                 AddressSettingsModule,
             ],
             providers: [
@@ -99,11 +94,6 @@ describe('StratumV1Client', () => {
         const dataSource = moduleRef.get<DataSource>(DataSource);
 
         dataSource.getRepository(ClientEntity).delete({});
-        dataSource.getRepository(ClientStatisticsEntity).delete({});
-
-        clientStatisticsService = moduleRef.get<ClientStatisticsService>(
-            ClientStatisticsService,
-        );
 
         comptoRpcService = new MockComptoRpcService(
             moduleRef.get(ConfigService),
@@ -130,7 +120,6 @@ describe('StratumV1Client', () => {
             socket,
             stratumV1JobsService,
             clientService,
-            clientStatisticsService,
             comptoRpcService,
             moduleRef.get(ConfigService),
         );
