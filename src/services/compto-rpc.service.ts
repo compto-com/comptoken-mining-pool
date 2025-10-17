@@ -15,7 +15,7 @@ import {
 } from '@compto/comptoken.js';
 import { ConfigService } from '@nestjs/config';
 import {
-    createTransferCheckedInstruction,
+    createTransferCheckedWithTransferHookInstruction,
     getAssociatedTokenAddressSync,
     TOKEN_2022_PROGRAM_ID,
 } from '@solana/spl-token';
@@ -232,17 +232,25 @@ export class ComptoRpcService implements OnModuleInit {
         const mineAmount = 100_00; // 100.00 COMP
         const userPayoutAmount = mineAmount - fee;
 
+        if (userPayoutAmount <= 0) {
+            // negative payouts should never happen due to the fee validation above
+            return { result: 'No payout to process' };
+        }
+
         const transferTransaction = new Transaction();
         transferTransaction.add(
-            createTransferCheckedInstruction(
-                compto_comptoken_pubkey,
-                this.compto_public_keys.comptoken_mint_pubkey,
-                recipient,
-                this.compto_keypair.publicKey,
-                userPayoutAmount,
-                COMPTOKEN_DECIMALS,
-                undefined,
-                TOKEN_2022_PROGRAM_ID,
+            /* prettier-ignore */ // prettier doesn't like the 'extra' spaces here
+            await createTransferCheckedWithTransferHookInstruction(
+                this.connection,                               // connection
+                compto_comptoken_pubkey,                       // source
+                this.compto_public_keys.comptoken_mint_pubkey, // mint
+                recipient,                                     // destination
+                this.compto_keypair.publicKey,                 // owner
+                BigInt(userPayoutAmount),                      // amount
+                COMPTOKEN_DECIMALS,                            // decimals
+                undefined,                                     // multiSigners
+                undefined,                                     // commitment
+                TOKEN_2022_PROGRAM_ID,                         // programId
             ),
         );
 
