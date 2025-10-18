@@ -91,10 +91,12 @@ export class ComptoRpcService implements OnModuleInit {
         switch (this.solana_cluster) {
             case 'mainnet-beta':
                 this.compto_public_keys = cpk;
+                break;
             case 'testnet':
                 throw new Error('Testnet not supported');
             case 'devnet':
                 this.compto_public_keys = devnet_cpk;
+                break;
             case 'local':
             default:
                 this.compto_public_keys = ComptoPublicKeys.loadFromCache(
