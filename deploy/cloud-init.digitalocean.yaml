@@ -1,0 +1,107 @@
+#cloud-config
+
+package_update: true
+package_upgrade: true
+packages:
+    - git
+
+write_files:
+    # Application environment used by both Docker Compose (for variable substitution)
+    # and mounted into the container at /public-pool/.env
+    - path: /opt/public-pool/.env
+      owner: root:root
+      permissions: '0640'
+      content: |
+          # Default ports; can be overridden by environment variables when starting Docker Compose
+          API_PORT=3334
+          STRATUM_PORT=3333
+
+          # "local" | "mainnet-beta" | "devnet" | <custom-url>; testnet is not supported
+          SOLANA_CLUSTER="devnet"
+
+          # used for local testing only (i.e. when SOLANA_CLUSTER is set to 'local')
+          COMPTO_PUBLIC_KEYS_PATH=
+
+          # "processed" | "confirmed" | "finalized" | "recent" | "single" | "singleGossip" | "root" | "max"
+          SOLANA_COMMITMENT="confirmed"
+
+          # the user account that will be used to sign transactions, pay for fees, and receive comptokens
+          SOLANA_USER=
+          # the path to the user account's keypair file, used if SOLANA_USER is not set
+          SOLANA_USER_PATH='/public-pool/secrets/id.json'
+
+          # the fee per submitted proof; 1 mining solution mines 100_00 comptokens, so 100 is 1%
+          FEE=10000 # 100%
+
+          # enable TLS for the Fastify API only if you provide certs at /public-pool/secrets
+          API_SECURE=false
+
+    # Override to expose ports publicly (0.0.0.0) instead of loopback (127.0.0.1)
+    - path: /opt/public-pool/docker-compose.override.yml
+      owner: root:root
+      permissions: '0644'
+      content: |
+          services:
+            public-pool:
+              ports: !override
+                - "${STRATUM_PORT}:${STRATUM_PORT}/tcp"
+                - "${API_PORT}:${API_PORT}/tcp"
+              volumes:
+                - "./secrets:/public-pool/secrets:ro"
+
+    # Systemd unit to manage the Docker Compose app
+    - path: /etc/systemd/system/public-pool.service
+      owner: root:root
+      permissions: '0644'
+      content: |
+          [Unit]
+          Description=Public Pool Stratum server (Docker Compose)
+          Requires=docker.service
+          After=network-online.target docker.service
+          Wants=network-online.target
+
+          [Service]
+          Type=oneshot
+          WorkingDirectory=/opt/public-pool
+          RemainAfterExit=true
+          # Ensure a Solana keypair is present before starting
+          ExecStartPre=/bin/bash -lc 'test -f /opt/public-pool/secrets/id.json || (echo "Missing /opt/public-pool/secrets/id.json" >&2; exit 1)'
+          ExecStart=/bin/bash -lc 'if docker compose version >/dev/null 2>&1; then docker compose up -d --build; else docker-compose up -d --build; fi'
+          ExecStop=/bin/bash -lc 'if docker compose version >/dev/null 2>&1; then docker compose down; else docker-compose down; fi'
+          TimeoutStartSec=0
+
+          [Install]
+          WantedBy=multi-user.target
+
+runcmd:
+    # Ensure Docker is enabled (DigitalOcean Docker droplets already have this active)
+    - systemctl enable --now docker || true
+
+    # Fetch application source (workaround b/c .env blocks simple clone)
+    - git -C /opt/public-pool init
+    - git -C /opt/public-pool remote remove origin 2>/dev/null || true
+    - git -C /opt/public-pool remote add origin https://github.com/compto-com/comptoken-mining-pool.git
+    - git -C /opt/public-pool fetch --depth 1 origin master
+    - git -C /opt/public-pool reset --hard FETCH_HEAD
+
+    # Ensure data directory exists to persist DB (matches default SOLANA_CLUSTER=devnet)
+    - mkdir -p /opt/public-pool/devnet-DB
+
+    # Prepare secrets directory for Solana keypair and optional TLS certs
+    - mkdir -p /opt/public-pool/secrets && chmod 700 /opt/public-pool/secrets
+
+    # Register the service but do not start until secrets are provided
+    - systemctl daemon-reload && systemctl enable public-pool.service
+
+final_message: |
+    Public Pool deployment completed. The service is enabled but will not start until your Solana keypair is uploaded.
+    - Repo path: /opt/public-pool
+    - Stratum: tcp/3333 (0.0.0.0)
+    - API:     tcp/3334 (0.0.0.0)
+    Next steps (manual):
+    1) Upload your Solana keypair to /opt/public-pool/secrets/id.json
+    2) Adjust /opt/public-pool/.env as needed (ports, SOLANA_CLUSTER, FEE, API_SECURE)
+    3) Allow inbound TCP 3333 and 3334 in your DigitalOcean Cloud Firewall (SSH 22 too)
+    4) Start the service: systemctl start public-pool
+    To adjust ports or cluster later, edit /opt/public-pool/.env and run: systemctl restart public-pool
+    Note: Inbound access is controlled by your DigitalOcean Cloud Firewall (recommended). Ensure TCP 22, 3333, 3334 are allowed.
