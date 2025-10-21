@@ -15,12 +15,67 @@ import { StratumV1JobsService } from '../services/stratum-v1-jobs.service';
 import { hasValue } from '../utils';
 import { StratumV1Client } from './StratumV1Client';
 
-jest.mock('../services/compto-rpc.service');
-
 jest.mock('./validators/comptoken-address.validator', () => ({
     IsComptokenAddress() {
         return jest.fn();
     },
+}));
+
+// Mock external dependencies to avoid real network/API
+jest.mock('@compto/comptoken.js', () => {
+    class ComptokenProof {
+        static TARGET_BYTES = new Uint8Array(32);
+        static TARGET_BYTES_DEVNET = new Uint8Array(32);
+        constructor(args: any) {
+            Object.assign(this, args);
+        }
+    }
+    return {
+        devnet_compto_public_keys: { comptoken_mint_pubkey: {} },
+        compto_public_keys: { comptoken_mint_pubkey: {} },
+        ComptoPublicKeys: {
+            loadFromCache: jest.fn(() => ({ comptoken_mint_pubkey: {} })),
+        },
+        ComptokenProof,
+        COMPTOKEN_DECIMALS: 2,
+        createProofSubmissionInstruction: jest.fn(async () => ({
+            ix: true,
+        })),
+        getValidBlockhashes: jest.fn(async () => ({
+            validBlockhash: Buffer.alloc(32, 7),
+        })),
+    };
+});
+
+jest.mock('@solana/web3.js', () => {
+    const PublicKey = jest.fn().mockImplementation((_v?: any) => ({
+        toBuffer: () => Buffer.alloc(32, 8),
+    }));
+    const Keypair = {
+        fromSecretKey: jest.fn(() => ({
+            publicKey: new (PublicKey as any)(),
+        })),
+    };
+    return {
+        clusterApiUrl: jest.fn(() => 'http://localhost:8899'),
+        Connection: jest.fn().mockImplementation(() => ({})),
+        PublicKey,
+        Keypair,
+        sendAndConfirmTransaction: jest.fn(async () => 'tx-sig'),
+        Transaction: jest.fn().mockImplementation(() => ({
+            add: jest.fn(),
+        })),
+    };
+});
+
+jest.mock('@solana/spl-token', () => ({
+    getAssociatedTokenAddressSync: jest.fn(() => ({
+        toBuffer: () => Buffer.alloc(32, 9),
+    })),
+    createTransferCheckedWithTransferHookInstruction: jest.fn(async () => ({
+        ix: true,
+    })),
+    TOKEN_2022_PROGRAM_ID: 'token-2022',
 }));
 
 describe('StratumV1Client', () => {
@@ -34,9 +89,7 @@ describe('StratumV1Client', () => {
 
     let socketEmitter: (...args: any[]) => void;
 
-    const newBlockEmitter: BehaviorSubject<Buffer> = new BehaviorSubject(
-        Buffer.alloc(0),
-    );
+    const newBlockEmitter = new BehaviorSubject(Buffer.alloc(0));
 
     let moduleRef: TestingModule;
 
@@ -66,6 +119,10 @@ describe('StratumV1Client', () => {
                                     return 'testnet';
                                 case 'SOLANA_USER':
                                     return '[139,213,84,120,244,40,122,74,179,90,146,128,49,120,237,17,191,242,118,123,14,170,241,142,42,39,157,78,139,34,95,63,255,22,35,190,4,231,156,200,108,132,200,209,236,204,10,79,198,65,98,199,1,96,246,42,208,183,163,32,54,176,27,238]';
+                                case 'SOLANA_CLUSTER':
+                                    return 'devnet';
+                                case 'SOLANA_COMMITMENT':
+                                    return 'confirmed';
                             }
                             return null;
                         }),
@@ -83,21 +140,20 @@ describe('StratumV1Client', () => {
     });
 
     beforeEach(async () => {
-        console.log('========================================================');
-        console.log('========================================================');
-        console.log('========================================================');
-        console.log('NEW TEST');
-        console.log(expect.getState().currentTestName);
-
         clientService = moduleRef.get<ClientService>(ClientService);
 
         const dataSource = moduleRef.get<DataSource>(DataSource);
-
-        dataSource.getRepository(ClientEntity).delete({});
+        await dataSource.getRepository(ClientEntity).delete({});
 
         comptoRpcService = new MockComptoRpcService(
             moduleRef.get(ConfigService),
         );
+        // Minimal internal state to allow verifyProof to run without onModuleInit
+        (comptoRpcService as any).blockHash = Buffer.alloc(32, 1);
+        (comptoRpcService as any).compto_public_keys = {
+            comptoken_mint_pubkey: {},
+        };
+
         jest.spyOn(comptoRpcService, 'getBlockTemplate').mockReturnValue(
             MockRecording1.BLOCK_TEMPLATE,
         );
@@ -108,7 +164,7 @@ describe('StratumV1Client', () => {
         socket = new Socket();
 
         jest.spyOn(socket, 'on').mockImplementation(
-            (event: string, listener: (...args: any[]) => void) => {
+            (_event: string, listener: (...args: any[]) => void) => {
                 socketEmitter = listener;
                 return socket;
             },
@@ -131,7 +187,7 @@ describe('StratumV1Client', () => {
 
     afterEach(async () => {
         if (hasValue(client)) {
-            client.destroy();
+            await client.destroy();
         }
         jest.useRealTimers();
     });
@@ -198,7 +254,6 @@ describe('StratumV1Client', () => {
             Promise.resolve(true),
         );
 
-        console.log('should set difficulty');
         socketEmitter(Buffer.from(MockRecording1.MINING_SUBSCRIBE));
         socketEmitter(Buffer.from(MockRecording1.MINING_AUTHORIZE));
         await new Promise((r) => setTimeout(r, 100));
@@ -221,21 +276,15 @@ describe('StratumV1Client', () => {
         await clientService.insertClients();
 
         const clientCount = await clientService.connectedClientCount();
-        console.error(`Connected clients: ${clientCount}`);
         expect(clientCount).toBe(1);
     });
 
     it('should send job and accept submission', async () => {
         const date = new Date(parseInt(MockRecording1.TIME, 16) * 1000);
-
         jest.setSystemTime(date);
 
         jest.spyOn(client as any, 'write').mockImplementation((_data) =>
             Promise.resolve(true),
-        );
-
-        (comptoRpcService.submitProof as jest.Mock).mockImplementation(() =>
-            Promise.resolve({ result: 'mocked result' }),
         );
 
         socketEmitter(Buffer.from(MockRecording1.MINING_SUBSCRIBE));
@@ -268,7 +317,19 @@ describe('StratumV1Client', () => {
         await new Promise((r) => setTimeout(r, 1000));
 
         expect((client as any).write).toHaveBeenLastCalledWith(
-            `{\"id\":5,\"error\":null,\"result\":true}\n`,
+            `{"id":5,"error":null,"result":true}\n`,
         );
+    });
+
+    afterAll(async () => {
+        try {
+            const dataSource = moduleRef.get<DataSource>(DataSource);
+            if (dataSource && dataSource.isInitialized) {
+                await dataSource.destroy();
+            }
+        } catch (_e) {
+            // ignore
+        }
+        await moduleRef.close();
     });
 });

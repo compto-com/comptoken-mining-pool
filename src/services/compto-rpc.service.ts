@@ -294,7 +294,7 @@ export class ComptoRpcService implements OnModuleInit {
             timestamp,
             compto_comptoken_pubkey,
         );
-        if (proofResult.error) {
+        if (hasValue(proofResult.error)) {
             return { error: proofResult.error };
         }
         const proof = proofResult.result as ComptokenProof;
