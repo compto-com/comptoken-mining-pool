@@ -8,6 +8,7 @@ import { BlocksService } from './ORM/blocks/blocks.service';
 import { ClientStatisticsService } from './ORM/client-statistics/client-statistics.service';
 import { ClientService } from './ORM/client/client.service';
 import { ComptoRpcService } from './services/compto-rpc.service';
+import { hasValue } from './utils';
 
 @Controller()
 export class AppController {
@@ -27,7 +28,7 @@ export class AppController {
         const CACHE_KEY = 'SITE_INFO';
         const cachedResult = await this.cacheManager.get(CACHE_KEY);
 
-        if (cachedResult != null) {
+        if (hasValue(cachedResult)) {
             return cachedResult;
         }
 
@@ -61,7 +62,7 @@ export class AppController {
         const CACHE_KEY = 'SITE_HASHRATE_GRAPH';
         const cachedResult = await this.cacheManager.get(CACHE_KEY);
 
-        if (cachedResult != null) {
+        if (hasValue(cachedResult)) {
             return cachedResult;
         }
 

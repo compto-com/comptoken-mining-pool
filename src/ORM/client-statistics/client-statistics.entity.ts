@@ -9,24 +9,24 @@ import { TrackedEntity } from '../utils/TrackedEntity.entity';
 @Index(['address', 'clientName', 'sessionId', 'time'])
 export class ClientStatisticsEntity extends TrackedEntity {
     @PrimaryGeneratedColumn()
-    id: number;
+    id!: number;
 
     @Column({ length: 62, type: 'varchar' })
-    address: string;
+    address!: string;
 
     @Column()
-    clientName: string;
+    clientName!: string;
 
     @Column({ length: 8, type: 'varchar' })
-    sessionId: string;
+    sessionId!: string;
 
     @Index()
     @Column({ type: 'integer' })
-    time: number;
+    time!: number;
 
     @Column({ type: 'real' })
-    shares: number;
+    shares!: number;
 
     @Column({ default: 0, type: 'integer' })
-    acceptedCount: number;
+    acceptedCount!: number;
 }

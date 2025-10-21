@@ -5,20 +5,20 @@ import { TrackedEntity } from '../utils/TrackedEntity.entity';
 @Entity()
 export class BlocksEntity extends TrackedEntity {
     @PrimaryGeneratedColumn()
-    id: number;
+    id!: number;
 
     @Column()
-    height: number;
+    height!: number;
 
     @Column({ length: 62, type: 'varchar' })
-    minerAddress: string;
+    minerAddress!: string;
 
     @Column()
-    worker: string;
+    worker!: string;
 
     @Column({ length: 8, type: 'varchar' })
-    sessionId: string;
+    sessionId!: string;
 
     @Column()
-    blockData: string;
+    blockData!: string;
 }

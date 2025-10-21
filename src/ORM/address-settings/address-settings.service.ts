@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
+import { hasValue } from '../../utils';
 import { AddressSettingsEntity } from './address-settings.entity';
 
 @Injectable()
@@ -15,7 +16,7 @@ export class AddressSettingsService {
         const settings = await this.addressSettingsRepository.findOne({
             where: { address },
         });
-        if (createIfNotFound == true && settings == null) {
+        if (createIfNotFound == true && !hasValue(settings)) {
             // It's possible to have a race condition here so if we get a PK violation, fetch it
             try {
                 return await this.createNew(address);

@@ -4,7 +4,7 @@ import { eStratumErrorCode } from '../enums/eStratumErrorCode';
 
 export class StratumErrorMessage {
     constructor(
-        private id: number | string = null,
+        private id: number | string | null = null,
         private errorCode: eStratumErrorCode,
         private errorMessage: string,
         private validationErrors: ValidationError[] = [],

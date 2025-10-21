@@ -8,9 +8,10 @@ import { useContainer } from 'class-validator';
 import { readFileSync } from 'fs';
 
 import { AppModule } from './app.module';
+import { hasValue } from './utils';
 
 async function bootstrap() {
-    if (process.env.API_PORT == null) {
+    if (!hasValue(process.env.API_PORT)) {
         console.error(
             'It appears your environment is not configured, create and populate an .env file.',
         );

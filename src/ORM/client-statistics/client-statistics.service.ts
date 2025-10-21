@@ -42,9 +42,16 @@ export class ClientStatisticsService {
             .execute();
     }
 
-    public async getChartDataForSite() {
-        var yesterday = new Date(new Date().getTime() - 24 * 60 * 60 * 1000);
+    private yesterday() {
+        // technically this is 24 hours ago, not yesterday (ignores DST)
+        return new Date(new Date().getTime() - 24 * 60 * 60 * 1000);
+    }
 
+    private oneHourAgo() {
+        return new Date(new Date().getTime() - 60 * 60 * 1000);
+    }
+
+    public async getChartDataForSite() {
         const query = `
             SELECT
                 time AS label,
@@ -52,7 +59,7 @@ export class ClientStatisticsService {
             FROM
                 client_statistics_entity AS entry
             WHERE
-                entry.time > ${yesterday.getTime()}
+                entry.time > ${this.yesterday().getTime()}
             GROUP BY
                 time
             ORDER BY
@@ -61,9 +68,10 @@ export class ClientStatisticsService {
 
     `;
 
-        const result: any[] = await this.clientStatisticsRepository.query(
-            query,
-        );
+        const result = (await this.clientStatisticsRepository.query(query)) as {
+            label: string;
+            data: number;
+        }[];
 
         return result
             .map((res) => {
@@ -74,8 +82,6 @@ export class ClientStatisticsService {
     }
 
     public async getChartDataForAddress(address: string) {
-        var yesterday = new Date(new Date().getTime() - 24 * 60 * 60 * 1000);
-
         const query = `
                 SELECT
                     time label,
@@ -83,7 +89,7 @@ export class ClientStatisticsService {
                 FROM
                     client_statistics_entity AS entry
                 WHERE
-                    entry.address = ? AND entry.time > ${yesterday.getTime()}
+                    entry.address = ? AND entry.time > ${this.yesterday().getTime()}
                 GROUP BY
                     time
                 ORDER BY
@@ -92,9 +98,9 @@ export class ClientStatisticsService {
 
         `;
 
-        const result = await this.clientStatisticsRepository.query(query, [
+        const result = (await this.clientStatisticsRepository.query(query, [
             address,
-        ]);
+        ])) as { label: string; data: number }[];
 
         return result
             .map((res) => {
@@ -105,21 +111,19 @@ export class ClientStatisticsService {
     }
 
     public async getHashRateForGroup(address: string, clientName: string) {
-        var oneHour = new Date(new Date().getTime() - 60 * 60 * 1000);
-
         const query = `
             SELECT
             SUM(entry.shares) AS difficultySum
             FROM
                 client_statistics_entity AS entry
             WHERE
-                entry.address = ? AND entry.clientName = ? AND entry.time > ${oneHour.getTime()}
+                entry.address = ? AND entry.clientName = ? AND entry.time > ${this.oneHourAgo().getTime()}
         `;
 
-        const result = await this.clientStatisticsRepository.query(query, [
+        const result = (await this.clientStatisticsRepository.query(query, [
             address,
             clientName,
-        ]);
+        ])) as { difficultySum: number }[];
 
         const difficultySum = result[0].difficultySum;
 
@@ -127,8 +131,6 @@ export class ClientStatisticsService {
     }
 
     public async getChartDataForGroup(address: string, clientName: string) {
-        var yesterday = new Date(new Date().getTime() - 24 * 60 * 60 * 1000);
-
         const query = `
             SELECT
                 time label,
@@ -136,7 +138,7 @@ export class ClientStatisticsService {
             FROM
                 client_statistics_entity AS entry
             WHERE
-                entry.address = ? AND entry.clientName = ? AND entry.time > ${yesterday.getTime()}
+                entry.address = ? AND entry.clientName = ? AND entry.time > ${this.yesterday().getTime()}
             GROUP BY
                 time
             ORDER BY
@@ -144,10 +146,10 @@ export class ClientStatisticsService {
             LIMIT 144;
         `;
 
-        const result = await this.clientStatisticsRepository.query(query, [
+        const result = (await this.clientStatisticsRepository.query(query, [
             address,
             clientName,
-        ]);
+        ])) as { label: string; data: number }[];
 
         return result
             .map((res) => {
@@ -175,11 +177,11 @@ export class ClientStatisticsService {
             LIMIT 2;
         `;
 
-        const result = await this.clientStatisticsRepository.query(query, [
+        const result = (await this.clientStatisticsRepository.query(query, [
             address,
             clientName,
             sessionId,
-        ]);
+        ])) as { createdAt: string; updatedAt: string; shares: number }[];
 
         if (result.length < 1) {
             return 0;
@@ -217,8 +219,6 @@ export class ClientStatisticsService {
         clientName: string,
         sessionId: string,
     ) {
-        var yesterday = new Date(new Date().getTime() - 24 * 60 * 60 * 1000);
-
         const query = `
             SELECT
                 time label,
@@ -226,7 +226,7 @@ export class ClientStatisticsService {
             FROM
                 client_statistics_entity AS entry
             WHERE
-                entry.address = ? AND entry.clientName = ? AND entry.sessionId = ? AND entry.time > ${yesterday.getTime()}
+                entry.address = ? AND entry.clientName = ? AND entry.sessionId = ? AND entry.time > ${this.yesterday().getTime()}
             GROUP BY
                 time
             ORDER BY
@@ -234,11 +234,11 @@ export class ClientStatisticsService {
             LIMIT 144;
         `;
 
-        const result = await this.clientStatisticsRepository.query(query, [
+        const result = (await this.clientStatisticsRepository.query(query, [
             address,
             clientName,
             sessionId,
-        ]);
+        ])) as { label: string; data: number }[];
 
         return result
             .map((res) => {

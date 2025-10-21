@@ -2,10 +2,11 @@ import { plainToInstance } from 'class-transformer';
 import { validate, ValidatorOptions } from 'class-validator';
 import * as crypto from 'crypto';
 import { Socket } from 'net';
-import { firstValueFrom, Subscription } from 'rxjs';
+import { Subscription } from 'rxjs';
 import { clearInterval } from 'timers';
 
-import { ClientStatisticsService } from '../ORM/client-statistics/client-statistics.service';
+import { ConfigService } from '@nestjs/config';
+import { PublicKey } from '@solana/web3.js';
 import { ClientEntity } from '../ORM/client/client.entity';
 import { ClientService } from '../ORM/client/client.service';
 import { ComptoRpcService } from '../services/compto-rpc.service';
@@ -13,36 +14,32 @@ import {
     IJobTemplate,
     StratumV1JobsService,
 } from '../services/stratum-v1-jobs.service';
+import { assert, hasValue } from '../utils';
 import { eRequestMethod } from './enums/eRequestMethod';
-import { eResponseMethod } from './enums/eResponseMethod';
 import { eStratumErrorCode } from './enums/eStratumErrorCode';
-import { MiningJob } from './MiningJob';
 import { AuthorizationMessage } from './stratum-messages/AuthorizationMessage';
 import { ConfigurationMessage } from './stratum-messages/ConfigurationMessage';
 import { MiningSubmitMessage } from './stratum-messages/MiningSubmitMessage';
+import { StratumBaseMessage } from './stratum-messages/StratumBaseMessage';
 import { StratumErrorMessage } from './stratum-messages/StratumErrorMessage';
 import { SubscriptionMessage } from './stratum-messages/SubscriptionMessage';
 import { SuggestDifficulty } from './stratum-messages/SuggestDifficultyMessage';
-import { StratumV1ClientStatistics } from './StratumV1ClientStatistics';
 
 export class StratumV1Client {
-    private clientSubscription: SubscriptionMessage;
-    private clientConfiguration: ConfigurationMessage;
-    private clientAuthorization: AuthorizationMessage;
-    private clientSuggestedDifficulty: SuggestDifficulty;
-    private stratumSubscription: Subscription;
+    private clientSubscription: SubscriptionMessage | null = null;
+    private clientConfiguration: ConfigurationMessage | null = null;
+    private clientAuthorization: AuthorizationMessage | null = null;
+    private stratumSubscription: Subscription | null = null;
     private backgroundWork: NodeJS.Timeout[] = [];
 
-    private statistics: StratumV1ClientStatistics;
     private stratumInitialized = false;
-    private sessionDifficulty: number = 16384;
 
-    private entity: ClientEntity;
-    private creatingEntity: Promise<void>;
+    private entity: ClientEntity | null = null;
+    private creatingEntity: Promise<void> | null = null;
 
-    public extraNonceAndSessionId: string;
-    public sessionStart: Date;
-    public noFee: boolean;
+    public extraNonceAndSessionId: string | null = null;
+    public sessionStart: Date | null = null;
+    public noFee: boolean = false;
     public hashRate: number = 0;
 
     private buffer: string = '';
@@ -51,13 +48,13 @@ export class StratumV1Client {
         public readonly socket: Socket,
         private readonly stratumV1JobsService: StratumV1JobsService,
         private readonly clientService: ClientService,
-        private readonly clientStatisticsService: ClientStatisticsService,
         private readonly comptoRpcService: ComptoRpcService,
+        private readonly configService: ConfigService,
     ) {
         console.log('StratumV1Client created');
         this.socket.on('data', (data: Buffer) => {
-            this.buffer += data.toString();
-            let lines = this.buffer.split('\n');
+            const accumulatedData = this.buffer + data.toString();
+            const lines = accumulatedData.split('\n');
             this.buffer = lines.pop() || ''; // Save the last part of the data (incomplete line) to the buffer
 
             lines
@@ -74,11 +71,11 @@ export class StratumV1Client {
     }
 
     public async destroy() {
-        if (this.extraNonceAndSessionId) {
+        if (hasValue(this.extraNonceAndSessionId)) {
             await this.clientService.delete(this.extraNonceAndSessionId);
         }
 
-        if (this.stratumSubscription != null) {
+        if (hasValue(this.stratumSubscription)) {
             this.stratumSubscription.unsubscribe();
         }
 
@@ -94,12 +91,39 @@ export class StratumV1Client {
         return hexString;
     }
 
+    private async validateMessage<MessageType extends StratumBaseMessage>(
+        parsedMessage: StratumBaseMessage,
+        messageType: new () => MessageType,
+    ) {
+        const message = plainToInstance(messageType, parsedMessage);
+
+        const validatorOptions: ValidatorOptions = {
+            whitelist: true,
+            forbidNonWhitelisted: true,
+        };
+
+        const errors = await validate(message, validatorOptions);
+
+        if (errors.length > 0) {
+            console.error('Validation error');
+            const err = new StratumErrorMessage(
+                message.id,
+                eStratumErrorCode.OtherUnknown,
+                'Validation error',
+                errors,
+            ).response();
+            console.error(err);
+            return { error: await this.write(err) };
+        }
+        return { result: message as MessageType };
+    }
+
     private async handleMessage(message: string) {
         console.log('Received message: ', message);
         console.log('----->');
 
         // Parse the message and check if it's the initial subscription message
-        let parsedMessage = null;
+        let parsedMessage: StratumBaseMessage;
         try {
             parsedMessage = JSON.parse(message);
         } catch (e) {
@@ -109,150 +133,35 @@ export class StratumV1Client {
 
         switch (parsedMessage.method) {
             case eRequestMethod.SUBSCRIBE: {
-                const subscriptionMessage = plainToInstance(
-                    SubscriptionMessage,
+                const success = await this.handleSubscriptionMessage(
                     parsedMessage,
                 );
-
-                const validatorOptions: ValidatorOptions = {
-                    whitelist: true,
-                    forbidNonWhitelisted: true,
-                };
-
-                const errors = await validate(
-                    subscriptionMessage,
-                    validatorOptions,
-                );
-
-                if (errors.length === 0) {
-                    if (this.sessionStart == null) {
-                        this.sessionStart = new Date();
-                        this.statistics = new StratumV1ClientStatistics(
-                            this.clientStatisticsService,
-                        );
-                        this.extraNonceAndSessionId = this.getRandomHexString();
-                        console.log(
-                            `New client ID: : ${this.extraNonceAndSessionId}, ${this.socket.remoteAddress}:${this.socket.remotePort}`,
-                        );
-                    }
-
-                    this.clientSubscription = subscriptionMessage;
-                    const success = await this.write(
-                        JSON.stringify(
-                            this.clientSubscription.response(
-                                this.extraNonceAndSessionId,
-                            ),
-                        ) + '\n',
-                    );
-                    if (!success) {
-                        return;
-                    }
-                } else {
-                    console.error('Subscription validation error');
-                    const err = new StratumErrorMessage(
-                        subscriptionMessage.id,
-                        eStratumErrorCode.OtherUnknown,
-                        'Subscription validation error',
-                        errors,
-                    ).response();
-                    console.error(err);
-                    const success = await this.write(err);
-                    if (!success) {
-                        return;
-                    }
+                if (!success) {
+                    return;
                 }
-
                 break;
             }
             case eRequestMethod.CONFIGURE: {
-                const configurationMessage = plainToInstance(
-                    ConfigurationMessage,
+                const success = await this.handleConfigureMessage(
                     parsedMessage,
                 );
-
-                const validatorOptions: ValidatorOptions = {
-                    whitelist: true,
-                    forbidNonWhitelisted: true,
-                };
-
-                const errors = await validate(
-                    configurationMessage,
-                    validatorOptions,
-                );
-
-                if (errors.length === 0) {
-                    this.clientConfiguration = configurationMessage;
-                    const success = await this.write(
-                        JSON.stringify(this.clientConfiguration.response()) +
-                            '\n',
-                    );
-                    if (!success) {
-                        return;
-                    }
-                } else {
-                    console.error('Configuration validation error');
-                    const err = new StratumErrorMessage(
-                        configurationMessage.id,
-                        eStratumErrorCode.OtherUnknown,
-                        'Configuration validation error',
-                        errors,
-                    ).response();
-                    console.error(err);
-                    const success = await this.write(err);
-                    if (!success) {
-                        return;
-                    }
+                if (!success) {
+                    return;
                 }
-
                 break;
             }
             case eRequestMethod.AUTHORIZE: {
-                const authorizationMessage = plainToInstance(
-                    AuthorizationMessage,
+                const success = await this.handleAuthorizationMessage(
                     parsedMessage,
                 );
-
-                const validatorOptions: ValidatorOptions = {
-                    whitelist: true,
-                    forbidNonWhitelisted: true,
-                };
-                console.log(authorizationMessage);
-                console.log('------------==--------------->');
-                console.log(validatorOptions);
-                const errors = await validate(
-                    authorizationMessage,
-                    validatorOptions,
-                );
-
-                if (errors.length === 0) {
-                    this.clientAuthorization = authorizationMessage;
-                    const success = await this.write(
-                        JSON.stringify(this.clientAuthorization.response()) +
-                            '\n',
-                    );
-                    if (!success) {
-                        return;
-                    }
-                } else {
-                    console.error('Authorization validation error');
-                    const err = new StratumErrorMessage(
-                        authorizationMessage.id,
-                        eStratumErrorCode.OtherUnknown,
-                        'Authorization validation error',
-                        errors,
-                    ).response();
-                    console.error(err);
-                    const success = await this.write(err);
-                    if (!success) {
-                        return;
-                    }
+                if (!success) {
+                    return;
                 }
-
                 break;
             }
             case eRequestMethod.SUGGEST_DIFFICULTY: {
-                return;
-                // No suggested difficulty for comptoken mining
+                // ignore: difficulty is constant for comptokens
+                break;
             }
             case eRequestMethod.SUBMIT: {
                 if (this.stratumInitialized == false) {
@@ -261,83 +170,160 @@ export class StratumV1Client {
                     return;
                 }
 
-                const miningSubmitMessage = plainToInstance(
-                    MiningSubmitMessage,
-                    parsedMessage,
-                );
-
-                const validatorOptions: ValidatorOptions = {
-                    whitelist: true,
-                    forbidNonWhitelisted: true,
-                };
-
-                const errors = await validate(
-                    miningSubmitMessage,
-                    validatorOptions,
-                );
-
-                if (errors.length === 0 && this.stratumInitialized == true) {
-                    const result = await this.handleMiningSubmission(
-                        miningSubmitMessage,
-                    );
-                    if (result == true) {
-                        const success = await this.write(
-                            JSON.stringify(miningSubmitMessage.response()) +
-                                '\n',
-                        );
-                        if (!success) {
-                            return;
-                        }
-                    }
-                } else {
-                    console.log('Mining Submit validation error');
-                    const err = new StratumErrorMessage(
-                        miningSubmitMessage.id,
-                        eStratumErrorCode.OtherUnknown,
-                        'Mining Submit validation error',
-                        errors,
-                    ).response();
-                    console.error(err);
-                    const success = await this.write(err);
-                    if (!success) {
-                        return;
-                    }
+                const success = await this.handleSubmitMessage(parsedMessage);
+                if (!success) {
+                    return;
                 }
                 break;
             }
         }
 
         if (
-            this.clientSubscription != null &&
-            this.clientAuthorization != null &&
+            hasValue(this.clientSubscription) &&
+            hasValue(this.clientAuthorization) &&
             this.stratumInitialized == false
         ) {
             await this.initStratum();
         }
     }
 
+    private async handleSubscriptionMessage(parsedMessage: StratumBaseMessage) {
+        const validationResult = await this.validateMessage(
+            parsedMessage,
+            SubscriptionMessage,
+        );
+        if (hasValue(validationResult.error)) {
+            console.error('Invalid subscription message');
+            return validationResult.error;
+        }
+        const subscriptionMessage =
+            validationResult.result as SubscriptionMessage;
+
+        if (!hasValue(this.sessionStart)) {
+            this.sessionStart = new Date();
+            this.extraNonceAndSessionId = this.getRandomHexString();
+            console.log(
+                `New client ID: : ${this.extraNonceAndSessionId}, ${this.socket.remoteAddress}:${this.socket.remotePort}`,
+            );
+        }
+
+        this.clientSubscription = subscriptionMessage;
+        return this.write(
+            JSON.stringify(
+                this.clientSubscription.response(
+                    this.extraNonceAndSessionId as string,
+                ),
+            ) + '\n',
+        );
+    }
+
+    private async handleConfigureMessage(parsedMessage: StratumBaseMessage) {
+        const validationResult = await this.validateMessage(
+            parsedMessage,
+            ConfigurationMessage,
+        );
+        if (hasValue(validationResult.error)) {
+            console.error('Invalid configuration message');
+            return validationResult.error;
+        }
+        const configurationMessage =
+            validationResult.result as ConfigurationMessage;
+
+        this.clientConfiguration = configurationMessage;
+        return this.write(
+            JSON.stringify(this.clientConfiguration.response()) + '\n',
+        );
+    }
+
+    private async handleAuthorizationMessage(
+        parsedMessage: StratumBaseMessage,
+    ) {
+        const validationResult = await this.validateMessage(
+            parsedMessage,
+            AuthorizationMessage,
+        );
+        if (hasValue(validationResult.error)) {
+            console.error('Invalid authorization message');
+            return validationResult.error;
+        }
+        const authorizationMessage =
+            validationResult.result as AuthorizationMessage;
+
+        this.clientAuthorization = authorizationMessage;
+        return this.write(
+            JSON.stringify(this.clientAuthorization.response()) + '\n',
+        );
+    }
+
+    private async handleSubmitMessage(parsedMessage: StratumBaseMessage) {
+        const validationResult = await this.validateMessage(
+            parsedMessage,
+            MiningSubmitMessage,
+        );
+        if (hasValue(validationResult.error)) {
+            console.error('Invalid mining submit message');
+            return validationResult.error;
+        }
+        const miningSubmitMessage =
+            validationResult.result as MiningSubmitMessage;
+
+        if (
+            this.clientConfiguration?.versionRolling &&
+            !hasValue(miningSubmitMessage.versionMask)
+        ) {
+            // If version rolling is enabled, the version mask is required
+            const err = new StratumErrorMessage(
+                miningSubmitMessage.id,
+                eStratumErrorCode.OtherUnknown,
+                'Version mask is required',
+            ).response();
+            await this.write(err);
+            return false;
+        }
+
+        const result = await this.handleMiningSubmission(miningSubmitMessage);
+        if (result === false) {
+            return false;
+        }
+        return this.write(
+            JSON.stringify(miningSubmitMessage.response()) + '\n',
+        );
+    }
+
     private async initStratum() {
         console.log('Initializing stratum');
         console.log('oooooooooooooooooooooooooo');
+        assert(
+            hasValue(this.clientSubscription),
+            'Client subscription is null',
+        );
+        assert(
+            hasValue(this.clientAuthorization),
+            'Client autorization is null',
+        );
 
         this.stratumInitialized = true;
 
         console.log('user agent: ', this.clientSubscription.userAgent);
+        let sessionDifficulty: number;
         switch (this.clientSubscription.userAgent) {
             case 'cpuminer': {
-                this.sessionDifficulty = 0.01;
+                sessionDifficulty = 0.01;
+                break;
+            }
+            default: {
+                sessionDifficulty = 16384; // TODO: where does this come from? should it be something else? configurable?
+                break;
             }
         }
 
-        if (this.clientSuggestedDifficulty == null) {
-            const setDifficulty = JSON.stringify(
-                new SuggestDifficulty().response(this.sessionDifficulty),
-            );
-            console.log('Setting difficulty to: ', setDifficulty);
-            const success = await this.write(setDifficulty + '\n');
-            if (!success) {
-                return;
-            }
+        const setDifficulty = JSON.stringify(
+            new SuggestDifficulty().response(sessionDifficulty),
+        );
+        console.log('Setting difficulty to: ', setDifficulty);
+        const success = await this.write(setDifficulty + '\n');
+        if (!success) {
+            return;
         }
 
         this.stratumSubscription =
@@ -351,24 +337,13 @@ export class StratumV1Client {
                     }
                 },
             );
-
-        this.backgroundWork.push(
-            setInterval(async () => {
-                await this.checkDifficulty();
-            }, 60 * 1000),
-        );
     }
 
     private async sendNewMiningJob(jobTemplate: IJobTemplate) {
         console.log('Sending new job');
         console.log(jobTemplate);
 
-        const job = new MiningJob(
-            this.stratumV1JobsService.getNextId(),
-            jobTemplate,
-        );
-
-        this.stratumV1JobsService.addJob(job);
+        const job = this.stratumV1JobsService.addJob(jobTemplate);
 
         const success = await this.write(job.response(jobTemplate));
         if (!success) {
@@ -377,12 +352,19 @@ export class StratumV1Client {
     }
 
     private async handleMiningSubmission(submission: MiningSubmitMessage) {
-        if (this.entity == null) {
-            if (this.creatingEntity == null) {
+        assert(
+            hasValue(this.clientAuthorization),
+            'Client authorization is null',
+        );
+        if (!hasValue(this.entity)) {
+            if (!hasValue(this.creatingEntity)) {
                 this.creatingEntity = new Promise(async (resolve, reject) => {
                     try {
+                        assert(hasValue(this.extraNonceAndSessionId));
+                        assert(hasValue(this.clientAuthorization));
+                        assert(hasValue(this.clientSubscription));
                         this.entity = await this.clientService.insert({
-                            sessionId: this.extraNonceAndSessionId,
+                            sessionId: this.extraNonceAndSessionId ?? undefined,
                             address: this.clientAuthorization.address,
                             clientName: this.clientAuthorization.worker,
                             userAgent: this.clientSubscription.userAgent,
@@ -403,46 +385,68 @@ export class StratumV1Client {
         const job = this.stratumV1JobsService.getJobById(submission.jobId);
 
         // a miner may submit a job that doesn't exist anymore if it was removed by a new block notification
-        if (job == null) {
+        if (!hasValue(job)) {
             const err = new StratumErrorMessage(
                 submission.id,
                 eStratumErrorCode.JobNotFound,
                 'Job not found',
             ).response();
-            const success = await this.write(err);
-            if (!success) {
-                return false;
-            }
+            await this.write(err);
             return false;
         }
         const jobTemplate = this.stratumV1JobsService.getJobTemplateById(
             job.jobTemplateId,
         );
-
-        const versionMask = parseInt(submission.versionMask, 16);
-        let version = 0x20000000;
-        if (versionMask !== undefined && versionMask != 0) {
-            version = version ^ versionMask;
-        }
+        assert(hasValue(jobTemplate), 'Job template not found');
 
         const xhashbuf = Buffer.from(
-            this.extraNonceAndSessionId + submission.extraNonce2,
+            jobTemplate.block.coinbasePart1 +
+                this.extraNonceAndSessionId +
+                submission.extraNonce2 +
+                jobTemplate.block.coinbasePart2,
             'hex',
         );
-        let extraDataHashed = this.doubleSHA256(xhashbuf);
+        const extraDataHashed = this.doubleSHA256(xhashbuf);
         const versionBuffer = Buffer.alloc(4);
-        versionBuffer.writeUInt32LE(jobTemplate.block.version);
+        let version = jobTemplate.block.version;
+        if (
+            hasValue(this.clientConfiguration) &&
+            this.clientConfiguration.versionRolling
+        ) {
+            if (
+                hasValue(submission.versionMask) &&
+                (parseInt(submission.versionMask, 16) &
+                    ~this.clientConfiguration.versionRollingMask) !=
+                    0
+            ) {
+                const err = new StratumErrorMessage(
+                    submission.id,
+                    eStratumErrorCode.OtherUnknown,
+                    'Invalid version mask',
+                ).response();
+                return this.write(err);
+            }
+            version &= this.clientConfiguration.versionRollingMask;
+        }
+        versionBuffer.writeUInt32LE(version);
 
-        let mintComptokensResult = await this.comptoRpcService.mineComptokens(
+        const FEE = this.configService.get<number>(
+            'FEE',
+            1_00, // 1% of 100_00 COMP
+        );
+        assert(0 <= FEE && FEE <= 100_00, 'FEE must be between 0 and 100_00');
+        const mintComptokensResult = await this.comptoRpcService.submitProof(
             extraDataHashed,
             parseInt(submission.nonce, 16),
             jobTemplate.block.version,
             parseInt(submission.ntime, 16),
+            new PublicKey(this.clientAuthorization.address),
+            FEE,
         );
 
-        if (mintComptokensResult.error != null) {
+        if (hasValue(mintComptokensResult.error)) {
             switch (mintComptokensResult.error) {
-                case 'Difficultu too low': {
+                case 'Difficulty too low': {
                     const err = new StratumErrorMessage(
                         submission.id,
                         eStratumErrorCode.LowDifficultyShare,
@@ -455,6 +459,9 @@ export class StratumV1Client {
                     return false;
                 }
                 default: {
+                    console.error(
+                        `Error mining comptokens: ${mintComptokensResult.error}`,
+                    );
                     const err = new StratumErrorMessage(
                         submission.id,
                         eStratumErrorCode.OtherUnknown,
@@ -479,7 +486,7 @@ export class StratumV1Client {
             '==================================================================================',
         );
 
-        await this.checkDifficulty();
+        //await this.checkDifficulty();
         return true;
     }
 
@@ -490,73 +497,6 @@ export class StratumV1Client {
             .update(firstHash)
             .digest();
         return secondHash;
-    }
-
-    private async checkDifficulty() {
-        const targetDiff = this.statistics.getSuggestedDifficulty(
-            this.sessionDifficulty,
-        );
-        if (targetDiff == null) {
-            return;
-        }
-
-        if (targetDiff != this.sessionDifficulty) {
-            this.sessionDifficulty = targetDiff;
-
-            const data =
-                JSON.stringify({
-                    id: null,
-                    method: eResponseMethod.SET_DIFFICULTY,
-                    params: [targetDiff],
-                }) + '\n';
-
-            await this.socket.write(data);
-            console.log('start to await newMiningJob$.');
-            const jobTemplate = await firstValueFrom(
-                this.stratumV1JobsService.newMiningJob$,
-            );
-            console.log('finish await newMiningJob$');
-            // we need to clear the jobs so that the difficulty set takes effect. Otherwise the different miner implementations can cause issues
-            jobTemplate.blockData.clearJobs = true;
-            await this.sendNewMiningJob(jobTemplate);
-        }
-    }
-
-    private hexStringToLittleEndianBuffer(hexString: string): Buffer {
-        // Remove any leading "0x" if present
-        if (hexString.startsWith('0x') || hexString.startsWith('0X')) {
-            hexString = hexString.slice(2);
-        }
-
-        // Ensure hex string length is even (full bytes)
-        if (hexString.length % 2 !== 0) {
-            hexString = '0' + hexString; // Pad with leading zero
-        }
-
-        // Split hex string into an array of bytes (two hex characters each)
-        const bytes = hexString.match(/.{2}/g);
-        if (!bytes) {
-            return Buffer.alloc(0); // Return empty buffer if no bytes
-        }
-
-        const wordSize = 4; // Word size in bytes (e.g., 4 bytes for 32-bit word)
-        const bufferArray: number[] = [];
-
-        for (let i = 0; i < bytes.length; i += wordSize) {
-            // Get the next word's bytes
-            const wordBytes = bytes.slice(i, i + wordSize);
-
-            // Reverse the bytes within the word for little-endian representation
-            const reversedWordBytes = wordBytes.reverse();
-
-            // Convert the hex strings to numbers and add to buffer array
-            reversedWordBytes.forEach((byteStr) => {
-                bufferArray.push(parseInt(byteStr, 16));
-            });
-        }
-
-        // Create a Buffer from the array of bytes
-        return Buffer.from(bufferArray);
     }
 
     private async write(message: string): Promise<boolean> {

@@ -8,37 +8,38 @@ import {
     MaxLength,
 } from 'class-validator';
 
+import { hasValue } from '../../utils';
 import { eRequestMethod } from '../enums/eRequestMethod';
-import { IsComptokenAddress } from '../validators/bitcoin-address.validator';
+import { IsComptokenAddress } from '../validators/comptoken-address.validator';
 import { StratumBaseMessage } from './StratumBaseMessage';
 
 export class AuthorizationMessage extends StratumBaseMessage {
     @IsArray()
     @ArrayMinSize(2)
     @ArrayMaxSize(2)
-    params: string[];
+    params!: string[];
 
     @Expose()
     @IsString()
-    @Transform(({ value, key, obj, type }) => {
+    @Transform(({ value: _value, key: _key, obj, type: _type }) => {
         return obj.params[0].split('.')[0];
     })
     @IsComptokenAddress()
-    public address: string;
+    public address!: string;
 
     @Expose()
     @IsString()
     @MaxLength(64)
-    @Transform(({ value, key, obj, type }) => {
-        return obj.params[0].split('.')[1] == null
-            ? 'worker'
-            : obj.params[0].split('.')[1];
+    @Transform(({ value: _value, key: _key, obj, type: _type }) => {
+        return hasValue(obj.params[0].split('.')[1])
+            ? obj.params[0].split('.')[1]
+            : 'worker';
     })
-    public worker: string;
+    public worker!: string;
 
     @Expose()
     @IsString()
-    @Transform(({ value, key, obj, type }) => {
+    @Transform(({ value: _value, key: _key, obj, type: _type }) => {
         return obj.params[1];
     })
     @MaxLength(64)

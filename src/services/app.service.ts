@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { ClientStatisticsService } from '../ORM/client-statistics/client-statistics.service';
 import { ClientService } from '../ORM/client/client.service';
 import { RpcBlockService } from '../ORM/rpc-block/rpc-block.service';
+import { hasValue } from '../utils';
 
 @Injectable()
 export class AppService implements OnModuleInit {
@@ -22,7 +23,7 @@ export class AppService implements OnModuleInit {
         // //6Gb
 
         if (
-            process.env.NODE_APP_INSTANCE == null ||
+            !hasValue(process.env.NODE_APP_INSTANCE) ||
             process.env.NODE_APP_INSTANCE == '0'
         ) {
             setInterval(async () => {

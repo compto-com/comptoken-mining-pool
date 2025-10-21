@@ -4,12 +4,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import { ObjectLiteral, Repository } from 'typeorm';
 
+import { assert, hasValue } from '../../utils';
 import { ClientEntity } from './client.entity';
 
 @Injectable()
 export class ClientService {
     public insertQueue: {
-        result: BehaviorSubject<ObjectLiteral | null>;
+        result: BehaviorSubject<ObjectLiteral>;
         partialClient: Partial<ClientEntity>;
     }[] = [];
 
@@ -33,7 +34,7 @@ export class ClientService {
     }
 
     public async killDeadClients() {
-        var fiveMinutes = new Date(
+        const fiveMinutes = new Date(
             new Date().getTime() - 5 * 60 * 1000,
         ).toISOString();
 
@@ -56,14 +57,14 @@ export class ClientService {
     ) {
         return await this.clientRepository.update(
             { address, clientName, sessionId },
-            { hashRate, deletedAt: null, updatedAt },
+            { hashRate, deletedAt: undefined, updatedAt },
         );
     }
 
     public async insert(
         partialClient: Partial<ClientEntity>,
     ): Promise<ClientEntity> {
-        const result = new BehaviorSubject(null);
+        const result = new BehaviorSubject({});
 
         this.insertQueue.push({ result, partialClient });
 
@@ -130,13 +131,15 @@ export class ClientService {
         clientName: string,
         sessionId: string,
     ): Promise<ClientEntity> {
-        return await this.clientRepository.findOne({
+        const existingClient = await this.clientRepository.findOne({
             where: {
                 address,
                 clientName,
                 sessionId,
             },
         });
+        assert(hasValue(existingClient), 'Client not found');
+        return existingClient;
     }
 
     public async deleteAll() {

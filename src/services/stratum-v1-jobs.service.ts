@@ -15,6 +15,7 @@ import {
 
 import { IComptoBlockTemplate } from '../models/compto-rpc/ComptoBlockTemplate';
 import { MiningJob } from '../models/MiningJob';
+import { hasValue } from '../utils';
 import { ComptoRpcService } from './compto-rpc.service';
 
 export interface IJobTemplate {
@@ -28,22 +29,21 @@ export interface IJobTemplate {
 
 @Injectable()
 export class StratumV1JobsService {
-    private lastIntervalCount: number;
+    private lastIntervalCount?: number;
     private skipNext: boolean = false;
     public newMiningJob$: Observable<IJobTemplate>;
 
     public latestJobId: number = 1;
     public latestJobTemplateId: number = 1;
 
-    public jobs: { [jobId: string]: MiningJob } = {};
+    public jobs: { [jobId: string]: MiningJob | undefined } = {};
 
-    public blocks: { [id: number]: IJobTemplate } = {};
+    public blocks: { [id: string]: IJobTemplate | undefined } = {};
 
     // offset the interval so that all the cluster processes don't try and refresh at the same time.
-    private delay =
-        process.env.NODE_APP_INSTANCE == null
-            ? 0
-            : parseInt(process.env.NODE_APP_INSTANCE) * 5000;
+    private delay = hasValue(process.env.NODE_APP_INSTANCE)
+        ? parseInt(process.env.NODE_APP_INSTANCE) * 5000
+        : 0;
 
     constructor(private readonly comptoRpcService: ComptoRpcService) {
         this.newMiningJob$ = combineLatest([
@@ -77,13 +77,10 @@ export class StratumV1JobsService {
 
                 this.lastIntervalCount = interval;
 
-                const id = this.getNextTemplateId();
-                this.latestJobTemplateId++;
-
                 const comptoJob: IJobTemplate = {
                     block: blockTemplate,
                     blockData: {
-                        id,
+                        id: this.getNextTemplateId(),
                         networkDifficulty: this.calculateNetworkDifficulty(
                             parseInt(blockTemplate.bits, 16),
                         ),
@@ -92,14 +89,14 @@ export class StratumV1JobsService {
                 };
                 return comptoJob;
             }),
-            filter((next) => next != null),
-
-            tap((data) => {
-                if (data.blockData.clearJobs) {
+            filter((template) => hasValue(template)),
+            map((template) => template as IJobTemplate), // Ensure type safety
+            tap((template) => {
+                if (template.blockData.clearJobs) {
                     this.blocks = {};
                     this.jobs = {};
                 }
-                this.blocks[data.blockData.id] = data;
+                this.blocks[template.blockData.id] = template;
             }),
             shareReplay({ refCount: true, bufferSize: 1 }),
         );
@@ -117,13 +114,15 @@ export class StratumV1JobsService {
         return difficulty;
     }
 
-    public getJobTemplateById(jobTemplateId: string): IJobTemplate | null {
+    public getJobTemplateById(jobTemplateId: string) {
         return this.blocks[jobTemplateId];
     }
 
-    public addJob(job: MiningJob) {
+    public addJob(template: IJobTemplate) {
+        const jobId = this.getNextId();
+        const job = new MiningJob(jobId, template);
         this.jobs[job.jobId] = job;
-        this.latestJobId++;
+        return job;
     }
 
     public getJobById(jobId: string) {
@@ -131,9 +130,11 @@ export class StratumV1JobsService {
     }
 
     public getNextTemplateId() {
+        this.latestJobTemplateId++;
         return this.latestJobTemplateId.toString(16);
     }
     public getNextId() {
+        this.latestJobId++;
         return this.latestJobId.toString(16);
     }
 }

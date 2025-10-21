@@ -12,23 +12,23 @@ import { TrackedEntity } from '../utils/TrackedEntity.entity';
 @Index(['address', 'clientName', 'sessionId'], { unique: true })
 export class ClientEntity extends TrackedEntity {
     @PrimaryColumn({ length: 62, type: 'varchar' })
-    address: string;
+    address!: string;
 
     @PrimaryColumn({ length: 64, type: 'varchar' })
-    clientName: string;
+    clientName!: string;
 
     @PrimaryColumn({ length: 8, type: 'varchar' })
-    sessionId: string;
+    sessionId!: string;
 
     @Column({ length: 128, type: 'varchar', nullable: true })
-    userAgent: string;
+    userAgent!: string;
 
     @Column({ type: 'datetime', transformer: new DateTimeTransformer() })
-    startTime: Date;
+    startTime!: Date;
 
     @Column({ type: 'real', default: 0 })
-    bestDifficulty: number;
+    bestDifficulty!: number;
 
     @Column({ default: 0 })
-    hashRate: number;
+    hashRate!: number;
 }
