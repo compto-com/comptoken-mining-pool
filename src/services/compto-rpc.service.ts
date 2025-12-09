@@ -5,18 +5,17 @@ import { BehaviorSubject, filter, shareReplay } from 'rxjs';
 import { IComptoBlockTemplate } from '../models/compto-rpc/ComptoBlockTemplate';
 
 import {
-    COMPTOKEN_DECIMALS,
+    addresses,
+    type ComptokenProgram,
     ComptokenProof,
-    ComptoPublicKeys,
-    compto_public_keys as cpk, // to make it harder to accidentally use the wrong public keys; use <ComtpoRpcService>.compto_public_keys instead
-    createProofSubmissionInstruction,
-    devnet_compto_public_keys as devnet_cpk,
-    getValidBlockhashes,
+    createComptokenProgram,
+    getDefaultComptokenIdl,
+    transactions,
 } from '@compto/comptoken.js';
+import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { ConfigService } from '@nestjs/config';
 import {
     createTransferCheckedWithTransferHookInstruction,
-    getAssociatedTokenAddressSync,
     TOKEN_2022_PROGRAM_ID,
 } from '@solana/spl-token';
 import {
@@ -31,10 +30,10 @@ import { assert, hasValue } from '../utils';
 
 @Injectable()
 export class ComptoRpcService implements OnModuleInit {
-    private compto_public_keys!: ComptoPublicKeys; // assigned in onModuleInit
     private compto_keypair: Keypair;
     private solana_cluster!: string; // assigned in onModuleInit
     private connection!: Connection; // assigned in onModuleInit
+    private comptoken_program!: ComptokenProgram; // assigned in onModuleInit
 
     private blockHash: Buffer | undefined;
     private _newBlock$: BehaviorSubject<Buffer> = new BehaviorSubject<Buffer>(
@@ -94,32 +93,15 @@ export class ComptoRpcService implements OnModuleInit {
                 break;
         }
 
-        switch (this.solana_cluster) {
-            case 'mainnet-beta':
-                this.compto_public_keys = cpk;
-                break;
-            case 'testnet':
-                throw new Error('Testnet not supported');
-            case 'devnet':
-                this.compto_public_keys = devnet_cpk;
-                break;
-            case 'local':
-            default:
-                this.compto_public_keys = ComptoPublicKeys.loadFromCache(
-                    this.configService.getOrThrow('COMPTO_PUBLIC_KEYS_PATH'),
-                );
-                break;
-        }
-        console.log(
-            `compto_public_keys: {\n` +
-                `${(
-                    Object.keys(
-                        this.compto_public_keys,
-                    ) as (keyof ComptoPublicKeys)[]
-                )
-                    .map((key) => `    ${key}: ${this.compto_public_keys[key]}`)
-                    .join(',\n')}\n` +
-                `}`,
+        this.comptoken_program = createComptokenProgram(
+            getDefaultComptokenIdl(),
+            new AnchorProvider(
+                this.connection,
+                new Wallet(this.compto_keypair),
+                {
+                    commitment: this.configService.get('SOLANA_COMMITMENT'),
+                },
+            ),
         );
 
         // Poll mining info immediately on startup
@@ -199,23 +181,16 @@ export class ComptoRpcService implements OnModuleInit {
         }
     }
 
-    private async mineComptokens(proof: ComptokenProof, pubkey: PublicKey) {
+    private async mineComptokens(proof: ComptokenProof) {
         try {
-            const mintComptokensTransaction = new Transaction();
-            mintComptokensTransaction.add(
-                await createProofSubmissionInstruction(
-                    proof,
-                    this.compto_keypair.publicKey,
-                    pubkey,
-                    this.compto_public_keys,
-                ),
-            );
+            const mintComptokensResult = await transactions.submitMiningProof({
+                program: this.comptoken_program,
+                proof,
+                accounts: {
+                    userWallet: this.compto_keypair,
+                },
+            });
 
-            const mintComptokensResult = await sendAndConfirmTransaction(
-                this.connection,
-                mintComptokensTransaction,
-                [this.compto_keypair],
-            );
             return { result: mintComptokensResult };
         } catch (e) {
             // Catch and return any errors during transaction
@@ -223,11 +198,7 @@ export class ComptoRpcService implements OnModuleInit {
         }
     }
 
-    private async processFees(
-        compto_comptoken_pubkey: PublicKey,
-        recipient: PublicKey,
-        fee: number,
-    ) {
+    private async processFees(recipient: PublicKey, fee: number) {
         assert(fee >= 0 && fee <= 100_00, 'Invalid fee rate');
         const mineAmount = 100_00; // 100.00 COMP
         const userPayoutAmount = mineAmount - fee;
@@ -241,16 +212,19 @@ export class ComptoRpcService implements OnModuleInit {
         transferTransaction.add(
             /* prettier-ignore */ // prettier doesn't like the 'extra' spaces here
             await createTransferCheckedWithTransferHookInstruction(
-                this.connection,                               // connection
-                compto_comptoken_pubkey,                       // source
-                this.compto_public_keys.comptoken_mint_pubkey, // mint
-                recipient,                                     // destination
-                this.compto_keypair.publicKey,                 // owner
-                BigInt(userPayoutAmount),                      // amount
-                COMPTOKEN_DECIMALS,                            // decimals
-                undefined,                                     // multiSigners
-                undefined,                                     // commitment
-                TOKEN_2022_PROGRAM_ID,                         // programId
+                this.connection,                                          // connection
+                addresses.getUserUnstakedAssociatedTokenAddress(
+                    this.comptoken_program,
+                    this.compto_keypair.publicKey,
+                ),                                                        // source
+                addresses.getUnstakedMintAddress(this.comptoken_program), // mint
+                recipient,                                                // destination
+                this.compto_keypair.publicKey,                            // owner
+                BigInt(userPayoutAmount),                                 // amount
+                this.comptoken_program.constants.mintDecimals,            // decimals
+                undefined,                                                // multiSigners
+                undefined,                                                // commitment
+                TOKEN_2022_PROGRAM_ID,                                    // programId
             ),
         );
 
@@ -280,40 +254,29 @@ export class ComptoRpcService implements OnModuleInit {
         recipient: PublicKey,
         fee: number,
     ) {
-        const compto_comptoken_pubkey = getAssociatedTokenAddressSync(
-            this.compto_public_keys.comptoken_mint_pubkey,
-            this.compto_keypair.publicKey,
-            false,
-            TOKEN_2022_PROGRAM_ID,
-        );
-
         const proofResult = this.verifyProof(
             extraData,
             nonce,
             version,
             timestamp,
-            compto_comptoken_pubkey,
+            addresses.getUserUnstakedAssociatedTokenAddress(
+                this.comptoken_program,
+                this.compto_keypair.publicKey,
+            ),
         );
         if (hasValue(proofResult.error)) {
             return { error: proofResult.error };
         }
         const proof = proofResult.result as ComptokenProof;
 
-        const mineResult = await this.mineComptokens(
-            proof,
-            compto_comptoken_pubkey,
-        );
+        const mineResult = await this.mineComptokens(proof);
         if (mineResult.error) {
             return { error: mineResult.error };
         }
 
         console.log('Mine Transaction Signature:', mineResult.result);
 
-        const processFeesResult = await this.processFees(
-            compto_comptoken_pubkey,
-            recipient,
-            fee,
-        );
+        const processFeesResult = await this.processFees(recipient, fee);
         if (processFeesResult.error) {
             return { error: processFeesResult.error };
         }
@@ -348,12 +311,11 @@ export class ComptoRpcService implements OnModuleInit {
 
     public getBlockTemplate(blockHash: Buffer): IComptoBlockTemplate {
         console.log('getBlockTemplate');
-        const testuser_comptoken_account = getAssociatedTokenAddressSync(
-            this.compto_public_keys.comptoken_mint_pubkey,
-            this.compto_keypair.publicKey,
-            false,
-            TOKEN_2022_PROGRAM_ID,
-        );
+        const testuser_comptoken_account =
+            addresses.getUserUnstakedAssociatedTokenAddress(
+                this.comptoken_program,
+                this.compto_keypair.publicKey,
+            );
         const hexTestComptoAccount = testuser_comptoken_account
             .toBuffer()
             .toString('hex');
@@ -371,13 +333,12 @@ export class ComptoRpcService implements OnModuleInit {
 
     public async getMiningInfo(): Promise<Buffer> {
         try {
-            const getvalidblockhash = await getValidBlockhashes(
-                this.connection,
-                this.compto_keypair,
-                this.compto_public_keys,
-            );
+            const { result: getvalidblockhash } =
+                await transactions.getValidBlockhashes({
+                    program: this.comptoken_program,
+                });
 
-            return Buffer.from(getvalidblockhash.validBlockhash);
+            return Buffer.from(getvalidblockhash.valid);
         } catch (e) {
             console.error(
                 'Error getmininginfo',

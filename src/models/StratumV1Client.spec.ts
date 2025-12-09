@@ -30,20 +30,37 @@ jest.mock('@compto/comptoken.js', () => {
             Object.assign(this, args);
         }
     }
-    return {
-        devnet_compto_public_keys: { comptoken_mint_pubkey: {} },
-        compto_public_keys: { comptoken_mint_pubkey: {} },
-        ComptoPublicKeys: {
-            loadFromCache: jest.fn(() => ({ comptoken_mint_pubkey: {} })),
-        },
-        ComptokenProof,
-        COMPTOKEN_DECIMALS: 2,
-        createProofSubmissionInstruction: jest.fn(async () => ({
-            ix: true,
+
+    const addresses = {
+        getUnstakedMintAddress: jest.fn(() => ({
+            toBuffer: () => Buffer.alloc(32, 10),
         })),
+        getUserUnstakedAssociatedTokenAddress: jest.fn(
+            (_program: any, _pubkey: any) => ({
+                toBuffer: () => Buffer.alloc(32, 11),
+            }),
+        ),
+    };
+
+    const transactions = {
         getValidBlockhashes: jest.fn(async () => ({
-            validBlockhash: Buffer.alloc(32, 7),
+            result: { valid: Buffer.alloc(32, 7) },
         })),
+        submitMiningProof: jest.fn(async () => 'tx-sig'),
+    };
+
+    const createComptokenProgram = jest.fn((_idl: any, _provider: any) => ({
+        constants: { mintDecimals: 2 },
+    }));
+
+    const getDefaultComptokenIdl = jest.fn(() => ({}));
+
+    return {
+        addresses,
+        ComptokenProof,
+        createComptokenProgram,
+        getDefaultComptokenIdl,
+        transactions,
     };
 });
 
@@ -150,9 +167,10 @@ describe('StratumV1Client', () => {
         );
         // Minimal internal state to allow verifyProof to run without onModuleInit
         (comptoRpcService as any).blockHash = Buffer.alloc(32, 1);
-        (comptoRpcService as any).compto_public_keys = {
-            comptoken_mint_pubkey: {},
-        };
+        // Ensure program is initialized for fee processing paths
+        (comptoRpcService as any).comptoken_program = {
+            constants: { mintDecimals: 2 },
+        } as any;
 
         jest.spyOn(comptoRpcService, 'getBlockTemplate').mockReturnValue(
             MockRecording1.BLOCK_TEMPLATE,
