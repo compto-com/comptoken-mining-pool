@@ -1,3 +1,4 @@
+import re
 import subprocess
 import threading
 import signal
@@ -16,21 +17,33 @@ processes: list[subprocess.Popen[bytes]] = []
 
 
 # Function to run a command and forward stdout and stderr to terminal
-def run_command(cmd: str, identifier: str):
+def run_command(cmd: str, identifier: str, forward_to_terminal: bool, cwd: str | None = None):
+    print(f"Starting command [{identifier}]: {cmd}")
     process = subprocess.Popen(cmd,
                                shell=True,
                                stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE)
+                               stderr=subprocess.PIPE,
+                               cwd=cwd)
     processes.append(process)
 
-    def forward_output(pipe: io.BytesIO):
-        for line in iter(pipe.readline, b''):
-            print(f'[{identifier}] {line.decode()}', end='')
+    def forward_output(pipe: io.BytesIO, mode: typing.Literal['a', 'w'], level: str):
+        file = f"{SCRIPT_DIR}/logs/{identifier}.log"
+
+        with open(file, mode) as file:
+            for line in iter(pipe.readline, b''):
+                msg = f'[{identifier}] [{level}] {line.decode()}'
+                if forward_to_terminal:
+                    print(msg, end='')
+
+                ANSI_ESCAPE = r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])'
+                cleaned_msg = re.sub(ANSI_ESCAPE, '', msg)
+                file.write(cleaned_msg)
+                file.flush()
 
     stdout_thread = threading.Thread(target=forward_output,
-                                     args=(process.stdout, ))
+                                     args=(process.stdout, 'w', 'INFO'))
     stderr_thread = threading.Thread(target=forward_output,
-                                     args=(process.stderr, ))
+                                     args=(process.stderr, 'a', 'ERROR'))
     stdout_thread.start()
     stderr_thread.start()
     process.wait()
@@ -53,10 +66,9 @@ if __name__ == "__main__":
 
     # should we add a way to start the solana-test-validator and compto programs?
     print("Starting the pool and cpuminer commands...")
-    # Run the pool and cpuminer commands in parallel
-    pool_thread = threading.Thread(target=run_command, args=(STRATUM_POOL_CMD, 'pool'))
-    cpuminer_thread = threading.Thread(target=run_command,
-                                    args=(CPU_MINER_CMD, 'miner'))
+    pool_thread = threading.Thread(target=run_command, args=(STRATUM_POOL_CMD, 'pool', True))
+    cpuminer_thread = threading.Thread(target=run_command, args=(CPU_MINER_CMD, 'miner', True))
+
     pool_thread.start()
     time.sleep(5)
     cpuminer_thread.start()
