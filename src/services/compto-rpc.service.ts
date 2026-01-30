@@ -257,10 +257,7 @@ export class ComptoRpcService implements OnModuleInit {
             nonce,
             version,
             timestamp,
-            addresses.getUserUnstakedAssociatedTokenAddress(
-                this.comptoken_program,
-                this.compto_keypair.publicKey,
-            ),
+            this.compto_keypair.publicKey,
         );
         if (hasValue(proofResult.error)) {
             return { error: proofResult.error };
@@ -309,12 +306,8 @@ export class ComptoRpcService implements OnModuleInit {
 
     public getBlockTemplate(blockHash: Buffer): IComptoBlockTemplate {
         console.log('getBlockTemplate');
-        const testuser_comptoken_account =
-            addresses.getUserUnstakedAssociatedTokenAddress(
-                this.comptoken_program,
-                this.compto_keypair.publicKey,
-            );
-        const hexTestComptoAccount = testuser_comptoken_account
+        const testuser_account = this.compto_keypair.publicKey;
+        const hexTestComptoAccount = testuser_account
             .toBuffer()
             .toString('hex');
         const blockTemplate: IComptoBlockTemplate = {
