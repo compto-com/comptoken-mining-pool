@@ -145,40 +145,35 @@ export class ComptoRpcService implements OnModuleInit {
                 : ComptokenProof.TARGET_BYTES_DEVNET;
 
         const recentBlockHash = Buffer.from(this.blockHash);
-        recentBlockHash.swap32();
 
         console.log(`pubkey: ${pubkey.toBuffer().toString('hex')}`);
         console.log(`recentBlockHash: ${this.blockHash.toString('hex')}`);
         console.log(`extraData: ${extraData.toString('hex')}`);
-        console.log(`nonce: ${nonce}`);
-        console.log(`version: ${version}`);
-        console.log(`timestamp: ${timestamp}`);
+        console.log(`nonce: ${nonce.toString(16)}`);
+        console.log(`version: ${version.toString(16)}`);
+        console.log(`timestamp: ${timestamp.toString(16)}`);
         console.log(`target: ${Buffer.from(target).toString('hex')}`);
 
-        try {
-            return {
-                result: new ComptokenProof({
-                    pubkey,
-                    recentBlockHash,
-                    extraData,
-                    nonce,
-                    version,
-                    timestamp,
-                    target,
-                }),
-            };
-        } catch (e) {
-            if (
-                e instanceof Error &&
-                e.message.startsWith(
-                    'The provided proof does not have enough zeroes',
-                )
-            ) {
-                return { error: 'Difficulty too low' };
-            }
-            // Return unexpected error message
-            return { error: e instanceof Error ? e.message : 'Unknown error' };
+        const proof = new ComptokenProof({
+            pubkey,
+            recentBlockHash,
+            extraData,
+            nonce,
+            version,
+            timestamp,
+            target,
+        });
+
+        console.log(`header: ${Buffer.from(proof.header).toString('hex')}`);
+        console.log(
+            `Computed proof hash: ${Buffer.from(proof.hash).toString('hex')}`,
+        );
+
+        if (!ComptokenProof.isLowerThanTarget(proof.hash, proof.target)) {
+            return { error: 'Difficulty too low' };
         }
+
+        return { result: proof };
     }
 
     private async mineComptokens(proof: ComptokenProof) {
@@ -192,8 +187,11 @@ export class ComptoRpcService implements OnModuleInit {
             });
 
             return { result: mintComptokensResult };
-        } catch (e) {
+        } catch (e: any) {
             // Catch and return any errors during transaction
+            if ('logs' in e) {
+                console.error('logs:', e.logs);
+            }
             return { error: e instanceof Error ? e.message : 'Unknown error' };
         }
     }
