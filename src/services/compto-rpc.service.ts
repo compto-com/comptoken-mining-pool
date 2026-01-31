@@ -12,7 +12,7 @@ import {
     getDefaultComptokenIdl,
     transactions,
 } from '@compto/comptoken.js';
-import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
+import { AnchorError, AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { ConfigService } from '@nestjs/config';
 import {
     createTransferCheckedWithTransferHookInstruction,
@@ -177,23 +177,83 @@ export class ComptoRpcService implements OnModuleInit {
     }
 
     private async mineComptokens(proof: ComptokenProof) {
-        try {
-            const mintComptokensResult = await transactions.submitMiningProof({
-                program: this.comptoken_program,
-                proof,
-                accounts: {
-                    userWallet: this.compto_keypair,
-                },
-            });
+        const mintComptokensResult = await tryWithLog(
+            async () =>
+                transactions.submitMiningProof({
+                    program: this.comptoken_program,
+                    proof,
+                    accounts: {
+                        userWallet: this.compto_keypair,
+                    },
+                }),
+            'Submit mining proof',
+        );
 
-            return { result: mintComptokensResult };
-        } catch (e: any) {
-            // Catch and return any errors during transaction
-            if ('logs' in e) {
-                console.error('logs:', e.logs);
-            }
-            return { error: e instanceof Error ? e.message : 'Unknown error' };
+        if ('result' in mintComptokensResult) {
+            return { result: mintComptokensResult.result };
         }
+        // handle error
+        if (
+            (mintComptokensResult.rawError as AnchorError)?.error?.errorCode
+                ?.code === 'UserDataProofsCapacityExceeded'
+        ) {
+            const increaseCapacityResult =
+                await this.increaseUserDataCapacity();
+            if ('error' in increaseCapacityResult) {
+                return { error: increaseCapacityResult.error };
+            }
+            console.log('Increased user data capacity, retrying mining proof');
+
+            // retry mining proof submission
+            return tryWithLog(
+                async () =>
+                    transactions.submitMiningProof({
+                        program: this.comptoken_program,
+                        proof,
+                        accounts: {
+                            userWallet: this.compto_keypair,
+                        },
+                    }),
+                'Submit mining proof',
+            );
+        }
+
+        return { error: mintComptokensResult.error };
+    }
+
+    private async increaseUserDataCapacity(additionalCapacity = 1) {
+        // get current capacity
+        const userDataAccountInfoResult = await tryWithLog(
+            async () =>
+                await this.comptoken_program.account.userData.fetch(
+                    addresses.getUserDataAddress(
+                        this.comptoken_program,
+                        this.compto_keypair.publicKey,
+                    ),
+                ),
+            'Fetch user data account info',
+        );
+        if ('error' in userDataAccountInfoResult) {
+            return { error: userDataAccountInfoResult.error };
+        }
+        const currentCapacity = userDataAccountInfoResult.result.proofs.length; // number of proofs currently stored (assumed to be at capacity)
+        const newCapacity = currentCapacity + additionalCapacity;
+
+        const resizeResult = await tryWithLog(
+            async () =>
+                await transactions.resizeUserDataAccount({
+                    program: this.comptoken_program,
+                    newCapacity: newCapacity,
+                    accounts: {
+                        userWallet: this.compto_keypair,
+                    },
+                }),
+            'Resize user data account',
+        );
+        if ('error' in resizeResult) {
+            return { error: resizeResult.error };
+        }
+        return { result: resizeResult.result };
     }
 
     private async processFees(recipient: PublicKey, fee: number) {
@@ -226,7 +286,7 @@ export class ComptoRpcService implements OnModuleInit {
             ),
         );
 
-        try {
+        return tryWithLog(async () => {
             const transferResult = await sendAndConfirmTransaction(
                 this.connection,
                 transferTransaction,
@@ -234,14 +294,8 @@ export class ComptoRpcService implements OnModuleInit {
             );
             console.log('Transfer result:', transferResult);
 
-            return { result: transferResult };
-        } catch (e) {
-            console.error(
-                'Error processing fees',
-                e instanceof Error ? e.message : e,
-            );
-            return { error: e instanceof Error ? e.message : 'Unknown error' };
-        }
+            return transferResult;
+        }, 'Process fees transfer');
     }
 
     public async submitProof(
@@ -281,6 +335,20 @@ export class ComptoRpcService implements OnModuleInit {
         return { result: true };
     }
 
+    async updateUserData() {
+        // when a new block is found, we need to update the user data account to clear out old proofs
+        return tryWithLog(
+            async () =>
+                await transactions.collect({
+                    program: this.comptoken_program,
+                    accounts: {
+                        userWallet: this.compto_keypair,
+                    },
+                }),
+            'Collect user data proofs',
+        );
+    }
+
     public async pollMiningInfo() {
         const _pollMiningInfo = async () => {
             const miningInfo = await this.getMiningInfo();
@@ -291,6 +359,9 @@ export class ComptoRpcService implements OnModuleInit {
                 console.log('blockhash change!!!');
                 this._newBlock$.next(miningInfo);
                 this.blockHash = miningInfo;
+
+                await this.updateUserData();
+
                 return true;
             }
             return false;
@@ -337,5 +408,20 @@ export class ComptoRpcService implements OnModuleInit {
             );
             throw e;
         }
+    }
+}
+
+async function tryWithLog<T>(fn: () => Promise<T>, logPrefix: string) {
+    try {
+        return { result: await fn() };
+    } catch (e) {
+        console.error(
+            `${logPrefix} - error:`,
+            e instanceof Error ? e.message : e,
+        );
+        return {
+            error: e instanceof Error ? e.message : 'Unknown error',
+            rawError: e,
+        };
     }
 }
