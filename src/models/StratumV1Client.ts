@@ -305,17 +305,18 @@ export class StratumV1Client {
         this.stratumInitialized = true;
 
         console.log('user agent: ', this.clientSubscription.userAgent);
-        let sessionDifficulty: number;
-        switch (this.clientSubscription.userAgent) {
-            case 'cpuminer': {
-                sessionDifficulty = 0.01;
-                break;
-            }
-            default: {
-                sessionDifficulty = 16384; // TODO: where does this come from? should it be something else? configurable?
-                break;
-            }
-        }
+        const cluster = this.configService.get<string>(
+            'SOLANA_CLUSTER',
+            'devnet',
+        );
+
+        const rawDifficulty = this.configService.get<number>(
+            'COMPTOKEN_DIFFICULTY',
+            cluster === 'mainnet-beta' ? 0x180eadd8 : 0x200eadd8, // default based on cluster
+        );
+        console.log('Raw difficulty: ', rawDifficulty);
+        const sessionDifficulty =
+            this.stratumV1JobsService.calculateNetworkDifficulty(rawDifficulty);
 
         const setDifficulty = JSON.stringify(
             new SuggestDifficulty().response(sessionDifficulty),

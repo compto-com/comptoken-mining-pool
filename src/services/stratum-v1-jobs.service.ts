@@ -102,7 +102,7 @@ export class StratumV1JobsService {
         );
     }
 
-    private calculateNetworkDifficulty(nBits: number) {
+    calculateNetworkDifficulty(nBits: number) {
         const mantissa: number = nBits & 0x007fffff; // Extract the mantissa from nBits
         const exponent: number = (nBits >> 24) & 0xff; // Extract the exponent from nBits
 
