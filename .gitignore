@@ -45,3 +45,6 @@ settings.json
 **.pem
 
 test-ledger
+
+.env.*
+!.env.example
