@@ -221,7 +221,7 @@ export class ComptoRpcService implements OnModuleInit {
         return { error: mintComptokensResult.error };
     }
 
-    private async increaseUserDataCapacity(additionalCapacity = 1) {
+    private async increaseUserDataCapacity(additionalCapacity = 100) {
         // get current capacity
         const userDataAccountInfoResult = await tryWithLog(
             async () =>
