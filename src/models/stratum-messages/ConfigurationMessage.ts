@@ -97,7 +97,9 @@ export class ConfigurationMessage extends StratumBaseMessage {
 
     private getVersionRollingProps(): VersionRollingProps {
         if (this.versionRolling) {
-            console.log(`version-rolling.mask: ${this.versionRollingMask}`);
+            console.log(
+                `version-rolling.mask: ${this.versionRollingMask.toString(16)}`,
+            );
 
             const bitCount = this.versionRollingMask
                 .toString(2)

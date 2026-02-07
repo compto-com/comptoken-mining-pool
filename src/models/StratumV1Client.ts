@@ -267,15 +267,20 @@ export class StratumV1Client {
         const miningSubmitMessage =
             validationResult.result as MiningSubmitMessage;
 
+        console.log('configuration: ', this.clientConfiguration);
+
         if (
-            this.clientConfiguration?.versionRolling &&
-            !hasValue(miningSubmitMessage.versionMask)
+            this.clientConfiguration?.versionRolling !=
+            hasValue(miningSubmitMessage.versionMask)
         ) {
             // If version rolling is enabled, the version mask is required
+            // If version rolling is disabled, the version mask is not allowed
             const err = new StratumErrorMessage(
                 miningSubmitMessage.id,
                 eStratumErrorCode.OtherUnknown,
-                'Version mask is required',
+                !hasValue(miningSubmitMessage.versionMask)
+                    ? 'Version mask is required for version rolling'
+                    : 'Version mask is not allowed',
             ).response();
             await this.write(err);
             return false;
@@ -408,17 +413,21 @@ export class StratumV1Client {
             'hex',
         );
         const extraDataHashed = this.doubleSHA256(xhashbuf);
-        const versionBuffer = Buffer.alloc(4);
         let version = jobTemplate.block.version;
         if (
             hasValue(this.clientConfiguration) &&
             this.clientConfiguration.versionRolling
         ) {
+            // this is checked in the message handler, but we assert here again for type safety
+            assert(
+                hasValue(submission.versionMask),
+                'Version mask is required for version rolling',
+            );
+            const versionMask = parseInt(submission.versionMask, 16);
+            // Ensure that the version mask only contains bits that are allowed to be changed
             if (
-                hasValue(submission.versionMask) &&
-                (parseInt(submission.versionMask, 16) &
-                    ~this.clientConfiguration.versionRollingMask) !=
-                    0
+                (versionMask & ~this.clientConfiguration.versionRollingMask) !=
+                0
             ) {
                 const err = new StratumErrorMessage(
                     submission.id,
@@ -427,9 +436,8 @@ export class StratumV1Client {
                 ).response();
                 return this.write(err);
             }
-            version &= this.clientConfiguration.versionRollingMask;
+            version |= versionMask;
         }
-        versionBuffer.writeUInt32LE(version);
 
         const FEE = this.configService.get<number>(
             'FEE',
@@ -439,7 +447,7 @@ export class StratumV1Client {
         const mintComptokensResult = await this.comptoRpcService.submitProof(
             extraDataHashed,
             parseInt(submission.nonce, 16),
-            jobTemplate.block.version,
+            version,
             parseInt(submission.ntime, 16),
             new PublicKey(this.clientAuthorization.address),
             FEE,
