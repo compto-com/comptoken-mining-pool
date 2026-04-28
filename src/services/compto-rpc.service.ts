@@ -176,7 +176,9 @@ export class ComptoRpcService implements OnModuleInit {
         return { result: proof };
     }
 
-    private async mineComptokens(proof: ComptokenProof) {
+    private async mineComptokens(
+        proof: ComptokenProof,
+    ): Promise<{ result?: string; error?: string }> {
         const mintComptokensResult = await tryWithLog(
             async () =>
                 transactions.submitMiningProof({
@@ -256,7 +258,10 @@ export class ComptoRpcService implements OnModuleInit {
         return { result: resizeResult.result };
     }
 
-    private async processFees(recipient: PublicKey, fee: number) {
+    private async processFees(
+        recipient: PublicKey,
+        fee: number,
+    ): Promise<{ result?: string; error?: string }> {
         assert(fee >= 0 && fee <= 100_00, 'Invalid fee rate');
         const mineAmount = 100_00; // 100.00 COMP
         const userPayoutAmount = mineAmount - fee;
@@ -396,7 +401,7 @@ export class ComptoRpcService implements OnModuleInit {
     public async getMiningInfo(): Promise<Buffer> {
         try {
             const { result: getvalidblockhash } =
-                await transactions.getValidBlockhashes({
+                await transactions.syncValidBlockhashes({
                     program: this.comptoken_program,
                 });
 
