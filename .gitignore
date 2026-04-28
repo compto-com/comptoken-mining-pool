@@ -43,3 +43,8 @@ settings.json
 
 #https
 **.pem
+
+test-ledger
+
+.env.*
+!.env.example

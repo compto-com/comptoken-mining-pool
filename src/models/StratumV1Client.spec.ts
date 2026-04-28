@@ -24,26 +24,50 @@ jest.mock('./validators/comptoken-address.validator', () => ({
 // Mock external dependencies to avoid real network/API
 jest.mock('@compto/comptoken.js', () => {
     class ComptokenProof {
-        static TARGET_BYTES = new Uint8Array(32);
-        static TARGET_BYTES_DEVNET = new Uint8Array(32);
+        static TARGET_BYTES = new Array(32).fill(0);
+        static TARGET_BYTES_DEVNET = new Array(32).fill(0);
+        header: Uint8Array;
+        hash: Uint8Array;
+        static isLowerThanTarget(_: any, __: any) {
+            return true;
+        }
         constructor(args: any) {
             Object.assign(this, args);
+            this.header = new Uint8Array(80);
+            this.hash = new Uint8Array(32);
         }
     }
+
+    const addresses = {
+        getUnstakedMintAddress: jest.fn(() => ({
+            toBuffer: () => Buffer.alloc(32, 10),
+        })),
+        getUserUnstakedAssociatedTokenAddress: jest.fn(
+            (_program: any, _pubkey: any) => ({
+                toBuffer: () => Buffer.alloc(32, 11),
+            }),
+        ),
+    };
+
+    const transactions = {
+        syncValidBlockhashes: jest.fn(async () => ({
+            result: { valid: Buffer.alloc(32, 7) },
+        })),
+        submitMiningProof: jest.fn(async () => 'tx-sig'),
+    };
+
+    const createComptokenProgram = jest.fn((_idl: any, _provider: any) => ({
+        constants: { mintDecimals: 2 },
+    }));
+
+    const getDefaultComptokenIdl = jest.fn(() => ({}));
+
     return {
-        devnet_compto_public_keys: { comptoken_mint_pubkey: {} },
-        compto_public_keys: { comptoken_mint_pubkey: {} },
-        ComptoPublicKeys: {
-            loadFromCache: jest.fn(() => ({ comptoken_mint_pubkey: {} })),
-        },
+        addresses,
         ComptokenProof,
-        COMPTOKEN_DECIMALS: 2,
-        createProofSubmissionInstruction: jest.fn(async () => ({
-            ix: true,
-        })),
-        getValidBlockhashes: jest.fn(async () => ({
-            validBlockhash: Buffer.alloc(32, 7),
-        })),
+        createComptokenProgram,
+        getDefaultComptokenIdl,
+        transactions,
     };
 });
 
@@ -117,6 +141,8 @@ describe('StratumV1Client', () => {
                                     return 'tb1qumezefzdeqqwn5zfvgdrhxjzc5ylr39uhuxcz4';
                                 case 'NETWORK':
                                     return 'testnet';
+                                case 'COMPTOKEN_DIFFICULTY':
+                                    return 0x200eadd8;
                                 case 'SOLANA_USER':
                                     return '[139,213,84,120,244,40,122,74,179,90,146,128,49,120,237,17,191,242,118,123,14,170,241,142,42,39,157,78,139,34,95,63,255,22,35,190,4,231,156,200,108,132,200,209,236,204,10,79,198,65,98,199,1,96,246,42,208,183,163,32,54,176,27,238]';
                                 case 'SOLANA_CLUSTER':
@@ -150,9 +176,10 @@ describe('StratumV1Client', () => {
         );
         // Minimal internal state to allow verifyProof to run without onModuleInit
         (comptoRpcService as any).blockHash = Buffer.alloc(32, 1);
-        (comptoRpcService as any).compto_public_keys = {
-            comptoken_mint_pubkey: {},
-        };
+        // Ensure program is initialized for fee processing paths
+        (comptoRpcService as any).comptoken_program = {
+            constants: { mintDecimals: 2 },
+        } as any;
 
         jest.spyOn(comptoRpcService, 'getBlockTemplate').mockReturnValue(
             MockRecording1.BLOCK_TEMPLATE,
@@ -255,12 +282,26 @@ describe('StratumV1Client', () => {
         );
 
         socketEmitter(Buffer.from(MockRecording1.MINING_SUBSCRIBE));
+        socketEmitter(Buffer.from(MockRecording1.MINING_CONFIGURE));
         socketEmitter(Buffer.from(MockRecording1.MINING_AUTHORIZE));
         await new Promise((r) => setTimeout(r, 100));
 
-        expect((client as any).write).toHaveBeenCalledWith(
-            `{"id":null,"method":"mining.set_difficulty","params":[16384]}\n`,
+        // Find the call that set the difficulty and assert it used the
+        // session difficulty computed by the jobs service.
+        const rawDifficulty = moduleRef
+            .get(ConfigService)
+            .get('COMPTOKEN_DIFFICULTY');
+        const expectedSessionDifficulty =
+            stratumV1JobsService.calculateNetworkDifficulty(rawDifficulty);
+
+        const calls = (client as any).write.mock.calls.map((c: any[]) => c[0]);
+        const setDifficultyCall = calls.find((c: string) =>
+            c.includes('"method":"mining.set_difficulty"'),
         );
+        expect(setDifficultyCall).toBeDefined();
+        const parsed = JSON.parse(setDifficultyCall as string);
+        expect(parsed.method).toBe('mining.set_difficulty');
+        expect(parsed.params[0]).toBeCloseTo(expectedSessionDifficulty, 8);
     });
 
     it('should save client', async () => {
@@ -269,6 +310,7 @@ describe('StratumV1Client', () => {
         );
 
         socketEmitter(Buffer.from(MockRecording1.MINING_SUBSCRIBE));
+        socketEmitter(Buffer.from(MockRecording1.MINING_CONFIGURE));
         socketEmitter(Buffer.from(MockRecording1.MINING_AUTHORIZE));
         await new Promise((r) => setTimeout(r, 100));
         socketEmitter(Buffer.from(MockRecording1.MINING_SUBMIT));
@@ -288,6 +330,7 @@ describe('StratumV1Client', () => {
         );
 
         socketEmitter(Buffer.from(MockRecording1.MINING_SUBSCRIBE));
+        socketEmitter(Buffer.from(MockRecording1.MINING_CONFIGURE));
         socketEmitter(Buffer.from(MockRecording1.MINING_SUGGEST_DIFFICULTY));
         socketEmitter(Buffer.from(MockRecording1.MINING_AUTHORIZE));
 
